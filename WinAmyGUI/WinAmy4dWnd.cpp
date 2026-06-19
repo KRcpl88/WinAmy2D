@@ -677,33 +677,13 @@ void CWinAmy4dWnd::CreateControls(HWND hWnd) {
     // 3D-mode zoom controls.
     m_hBtnZoomIn  = makeBtn(L"Zoom +", IDC_BTN_ZOOM_IN,  60);
     m_hBtnZoomOut = makeBtn(L"Zoom -", IDC_BTN_ZOOM_OUT, 60);
-    // 2D-mode control: selects which plane of the 4D board the flat view shows
-    // (an axis swap applied purely for rendering). Hidden in 3D mode.
-    {
-        int nCbH = 140;
-        m_hCbSwapAxes = CreateWindowExW(0, L"COMBOBOX", L"",
-            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST,
-            m_nDropdownX, BTN_Y, DROPDOWN_W, nCbH, hWnd,
-            (HMENU)(INT_PTR)IDC_CB_SWAP_AXES, hInst, nullptr);
-        // Index order matches the switch in OnCommand: 0=x/y, 1=x/z, 2=y/z.
-        static const wchar_t* kSwapLabels[] = {
-            L"x/y plane",
-            L"x/z plane",
-            L"y/z plane",
-        };
-        for (auto* psz : kSwapLabels) {
-            SendMessageW(m_hCbSwapAxes, CB_ADDSTRING, 0, (LPARAM)psz);
-        }
-        SendMessageW(m_hCbSwapAxes, CB_SETCURSEL, 0, 0);
-    }
 
     // Initial visibility for the current (2D) view mode: the 3D-only view
-    // controls are hidden, while the 2D-only plane selector stays visible.
+    // controls are hidden.
     ShowWindow(m_hCbGridType,  SW_HIDE);
     ShowWindow(m_hBtnZoomIn,   SW_HIDE);
     ShowWindow(m_hBtnZoomOut,  SW_HIDE);
     ShowWindow(m_hBtnRotateGrid, SW_HIDE);
-    ShowWindow(m_hCbSwapAxes,  SW_SHOW);
 
     // Status bar
     m_hStatus = CreateWindowExW(0, STATUSCLASSNAMEW, nullptr,
@@ -722,7 +702,6 @@ void CWinAmy4dWnd::CreateControls(HWND hWnd) {
     UpdatePauseMenu();
     UpdateLegalMoveHighlightMenu();
     UpdateViewToggleButton();
-    UpdateAxisControls();
     UpdateSuggestMoveButton();
 }
 
@@ -1577,21 +1556,6 @@ void CWinAmy4dWnd::UpdateViewToggleButton() {
         m_eViewMode == ViewMode::Mode2D ? L"Switch to 3D" : L"Switch to 2D");
 }
 
-void CWinAmy4dWnd::UpdateAxisControls() {
-    // The axis-swap dropdown is a 2D-view control selecting which plane of the
-    // 4D board the flat view renders. Keep its selection in sync with the
-    // renderer's current view plane (indices: 0=x/y, 1=x/z, 2=y/z).
-    if (m_hCbSwapAxes) {
-        int nIndex = 0;
-        switch (m_Renderer.GetViewPlane()) {
-        case BoardRenderer::ViewPlane::PlaneXY: nIndex = 0; break;
-        case BoardRenderer::ViewPlane::PlaneXZ: nIndex = 1; break;
-        case BoardRenderer::ViewPlane::PlaneYZ: nIndex = 2; break;
-        }
-        SendMessageW(m_hCbSwapAxes, CB_SETCURSEL, (WPARAM)nIndex, 0);
-    }
-}
-
 void CWinAmy4dWnd::SetViewMode(ViewMode mode) {
     if (mode == m_eViewMode) return;
     m_eViewMode = mode;
@@ -1622,17 +1586,15 @@ void CWinAmy4dWnd::SetViewMode(ViewMode mode) {
         }
         ShowWindow(m_hRender3D, SW_SHOW);
         ShowScrollBar(m_hWnd, SB_BOTH, FALSE);
-        // 3D-only toolbar controls become visible; the 2D plane selector hides.
+        // 3D-only toolbar controls become visible.
         ShowWindow(m_hCbGridType,  SW_SHOW);
         ShowWindow(m_hBtnZoomIn,   SW_SHOW);
         ShowWindow(m_hBtnZoomOut,  SW_SHOW);
         ShowWindow(m_hBtnRotateGrid, SW_SHOW);
-        ShowWindow(m_hCbSwapAxes,  SW_HIDE);
         // Enable the 3D-only View menu items.
         EnableMenuItem(hMenu, IDM_VIEW_SHOW_GRIDLINES, MF_BYCOMMAND | MF_ENABLED);
         EnableMenuItem(hMenu, IDM_VIEW_RESET_VIEW,     MF_BYCOMMAND | MF_ENABLED);
         UpdateOutlinesMenuItem();
-        UpdateAxisControls();
         // Reflect the renderer's actual grid type in the menu checkmark
         // and combobox selection (the renderer is the source of truth —
         // the menu and combobox are just UI).
@@ -1650,18 +1612,16 @@ void CWinAmy4dWnd::SetViewMode(ViewMode mode) {
         ShowWindow(m_hRender3D, SW_HIDE);
         ShowScrollBar(m_hWnd, SB_BOTH, TRUE);
         UpdateScrollBars(m_hWnd);
-        // 3D-only toolbar controls hide; the 2D plane selector becomes visible.
+        // 3D-only toolbar controls hide.
         ShowWindow(m_hCbGridType,  SW_HIDE);
         ShowWindow(m_hBtnZoomIn,   SW_HIDE);
         ShowWindow(m_hBtnZoomOut,  SW_HIDE);
         ShowWindow(m_hBtnRotateGrid, SW_HIDE);
-        ShowWindow(m_hCbSwapAxes,  SW_SHOW);
         // Disable the 3D-only View menu items.
         EnableMenuItem(hMenu, IDM_VIEW_SHOW_GRIDLINES,
             MF_BYCOMMAND | MF_GRAYED | MF_DISABLED);
         EnableMenuItem(hMenu, IDM_VIEW_RESET_VIEW,
             MF_BYCOMMAND | MF_GRAYED | MF_DISABLED);
-        UpdateAxisControls();
     }
     UpdateGridMenuEnabled();
     UpdateViewToggleButton();
@@ -2076,27 +2036,6 @@ LRESULT CWinAmy4dWnd::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
                     SetGridType(static_cast<CUCoord::EOutlineType>(
                         static_cast<int>(CUCoord::OT_full) + nSel));
                 }
-            }
-            break;
-
-        case IDC_CB_SWAP_AXES:
-            // 2D-view plane selector: choose which plane of the 4D board the
-            // flat view renders. The swap is applied purely for rendering; all
-            // board state stays in ordinary (unswapped) coordinates.
-            if (code == CBN_SELCHANGE) {
-                int nSel = (int)SendMessageW(m_hCbSwapAxes, CB_GETCURSEL, 0, 0);
-                BoardRenderer::ViewPlane ePlane = BoardRenderer::ViewPlane::PlaneXY;
-                switch (nSel) {
-                case 0: ePlane = BoardRenderer::ViewPlane::PlaneXY; break; // x/y, no swap
-                case 1: ePlane = BoardRenderer::ViewPlane::PlaneXZ; break; // x/z, swap Y/Z
-                case 2: ePlane = BoardRenderer::ViewPlane::PlaneYZ; break; // y/z, swap X/Z
-                }
-                m_Renderer.SetViewPlane(ePlane);
-                // The selected location is stored in canonical (unswapped)
-                // board coordinates and matched for rendering by bit offset,
-                // so it survives a plane change unchanged — keep the current
-                // selection and its legal destinations instead of clearing.
-                InvalidateRect(m_hWnd, nullptr, TRUE);
             }
             break;
 
