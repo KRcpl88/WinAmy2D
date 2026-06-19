@@ -1,0 +1,16 @@
+#pragma once
+#define HAVE___BUILTIN_POPCOUNTLL 0
+#define HAVE_POPCNT 0
+#define HAVE___BUILTIN_CTZLL 0
+#define HAVE_FFSLL 0
+#define HAVE_LIBPTHREAD 0
+#define HAVE_STDATOMIC_H 0
+#define HAVE_SYS_TIME_H 0
+#define HAVE_UNISTD_H 0
+#define HAVE_SYS_SOCKET_H 0
+#define HAVE_NETDB_H 0
+#define HAVE_GETTIMEOFDAY 0
+#define HAVE_SELECT 0
+#define HAVE_GETHOSTNAME 0
+#define HAVE_SETBUF 1
+#define MP 1
