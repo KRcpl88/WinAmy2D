@@ -1,0 +1,188 @@
+# WinAmy - Copilot Instructions
+
+## Build Commands
+
+Build entire solution (Debug x64):
+```
+msbuild WinAmy.sln /p:Configuration=Debug /p:Platform=x64 /m
+```
+
+Build only the test project:
+```
+msbuild WinAmy.sln /p:Configuration=Debug /p:Platform=x64 /m /t:WinAmyTests:Rebuild
+```
+
+Run all unit tests:
+```
+vstest.console.exe x64\Debug\WinAmyTests.dll /Platform:x64
+```
+
+Run a single test by name:
+```
+vstest.console.exe x64\Debug\WinAmyTests.dll /Platform:x64 /Tests:TestMethodName
+```
+
+Run tests in a single class:
+```
+vstest.console.exe x64\Debug\WinAmyTests.dll /Platform:x64 /Tests:ClassName
+```
+
+### Test Categories (scenarios)
+
+Tests can be grouped into scenarios (e.g. a fast base regression pass vs. a deeper
+full pass). Slow tests are tagged with a `TestCategory` trait, which groups them
+under **Traits** in Visual Studio Test Explorer (right-click → group/filter by trait):
+```cpp
+BEGIN_TEST_METHOD_ATTRIBUTE(MethodName)
+    TEST_METHOD_ATTRIBUTE(L"TestCategory", L"LongRunning")
+END_TEST_METHOD_ATTRIBUTE()
+TEST_METHOD(MethodName) { ... }
+```
+
+Note: the native C++ test adapter (`cppunittestexecutor`) only supports `Name` and
+`FullyQualifiedName` in `/TestCaseFilter` — it does **not** filter on `TestCategory`
+from the command line. So on the command line, select scenarios by test name.
+
+Base regression pass (default; excludes the slow tests by name):
+```
+vstest.console.exe x64\Debug\WinAmyTests.dll /Platform:x64 /TestCaseFilter:"FullyQualifiedName!~EngineSelfPlayKeepsBothKings"
+```
+
+Deeper / full pass (run everything, including the slow tests):
+```
+vstest.console.exe x64\Debug\WinAmyTests.dll /Platform:x64
+```
+
+Run only the slow test for a deeper scenario:
+```
+vstest.console.exe x64\Debug\WinAmyTests.dll /Platform:x64 /Tests:EngineSelfPlayKeepsBothKings
+```
+
+`EngineSelfPlayKeepsBothKings` is tagged `LongRunning` and is excluded from the
+default CI pass; run it explicitly (or via the full pass) for deeper scenarios.
+
+## Architecture
+
+WinAmy is a chess engine (fork of "Amy") built as a Windows C application with a C++ test harness.
+
+### Solution Projects
+
+| Project | Language | Output | Purpose |
+|---------|----------|--------|---------|
+| **src** | C | Static library (`src.lib`) | Core engine library — all chess logic |
+| **WinAmy** | C/C++ | `x64/{Config}/WinAmy.exe` | Thin executable shell that links `src.lib` |
+| **WinAmyTests** | C++ | `x64/Debug/WinAmyTests.dll` | Unit tests using Microsoft CppUnitTest |
+
+### Engine Source Layout
+
+- `include/` — All header files for the engine
+- `src/` — All C implementation files for the engine
+- `include/config.h` — **Gitignored**, must be generated before building (CI does this automatically). Defines platform capability flags (`HAVE___BUILTIN_POPCOUNTLL`, etc.)
+
+### Logging (WinAmyGUI)
+
+`WinAmyGUI.exe` is a `/SUBSYSTEM:WINDOWS` app with no console, so engine output sent to `stdout` (via `Print`/`PrintNoLog`) is discarded and cannot be captured. To diagnose engine behaviour (e.g. illegal or non-optimal moves), enable file logging with an **optional command-line switch** (logging is off by default):
+
+```
+WinAmyGUI.exe -log              # logs to the default file Amy.log
+WinAmyGUI.exe -log <filename>   # logs to <filename>
+WinAmyGUI.exe -log:<filename>   # logs to <filename>
+WinAmyGUI.exe -log=<filename>   # logs to <filename>
+```
+
+The switch is case-insensitive and accepts `-`, `--`, or `/` prefixes. The default log file name is **`Amy.log`**, written (truncated) to the working directory. Both `Print` and `PrintNoLog` output are mirrored to the log file once it is open. Parsing lives in `ConfigureLoggingFromCommandLine` (`WinAmyGUI/WinAmy4dWnd.cpp`), which calls the engine's `OpenLogFile` (`src/utils.cpp`).
+
+### Key Engine Modules
+
+- **bitboard.h/bitboard.c** — Bit manipulation: `SetMask`, `ClrMask`, `SetBit`, `ClrBit`, `TstBit`, `FindSetBit`, `CountBits`
+- **dbase.h/dbase.c** — Position representation, move generation, `DoMove`/`UndoMove`, legality checking
+- **magic.h/magic.c** — Magic bitboard sliding piece attack generation
+- **search.h/search.c** — Alpha-beta search with extensions
+- **evaluation.h/evaluation.c** — Static position evaluation
+- **inline.h** — Inline helper functions: `make_move`, `make_promotion`, `InCheck`, `PromoType`
+
+### Test Project Structure
+
+- `WinAmyTests/TestHelpers.h` — Shared header (includes, `PositionGuard` RAII class, helper declarations)
+- `WinAmyTests/TestHelpers.cpp` — Helper implementations (PascalCase naming)
+- One `.cpp` file per test class: `BitboardTests.cpp`, `AttackTests.cpp`, `MoveTests.cpp`, `PositionTests.cpp`
+
+## Conventions
+
+### C/C++ Boundary
+
+Engine code is C. Test code is C++. When including engine headers in test files, wrap them in `extern "C" {}`:
+```cpp
+extern "C" {
+#include "bitboard.h"
+#include "dbase.h"
+}
+```
+
+### Naming Conventions
+
+- **All C++ function and method names use PascalCase** (e.g., `GetX`, `SetAxis`, `CreatePositionFromEPD`)
+- This applies to all member functions in engine classes, test helpers, and test methods alike
+- **All variable and parameter names use Hungarian notation with PascalCase**, following Win32 API conventions:
+  - `n` — integer (e.g., `nIndex`, `nCount`)
+  - `dw` — DWORD / unsigned 32-bit (e.g., `dwFlags`)
+  - `w` — WORD / unsigned 16-bit (e.g., `wOffset`)
+  - `b` — BYTE / unsigned 8-bit (e.g., `bValid`)
+  - `d` — double (e.g., `dRotation`)
+  - `f` — float or bool (e.g., `fScale`, `fEnabled`)
+  - `sz` / `psz` — null-terminated string / pointer to string (e.g., `szName`)
+  - `p` — pointer (e.g., `pNode`)
+  - `rg` — array (e.g., `rgAxes`, `rgnData`)
+  - `m_` — member variable prefix (e.g., `m_nLevel`, `m_rgdData`)
+  - `g_` — global variable prefix (e.g., `g_nCount`)
+  - `s_` — static variable prefix (e.g., `s_nInstances`)
+- **Class objects (instances) do NOT take a Hungarian type prefix — use plain PascalCase.** A variable whose type is a class/struct *object* (for example `CMove`, `CPosition`, `CSCoord`, `PositionGuard`) is named in PascalCase with no leading type tag: `CMove BestMove` (not `mvBestMove`/`bestMove`), `CSCoord FromCoord` (not `coFromCoord`). This also applies to **C++ standard-library template specializations**, which are class objects: `std::vector<CMove> Moves` (not `rgMoves` — a `std::vector` is a container object, not a raw array), `std::string Name`, `std::unique_ptr<CSearchData> SearchData`. The `m_`/`g_`/`s_` scope prefixes still apply to class-object members/globals/statics (e.g., `m_BestMove`, `s_Position`). Pointers to class objects keep the `p` pointer prefix (e.g., `pPosition`).
+- **This rule is mandatory and has no exceptions.** Every variable name — including local variables, loop indices, temporaries, function parameters, and variables in test code — must carry the correct Hungarian type prefix combined with PascalCase. For example, use `nNewRank` (not `newRank`), `nDblRank` (not `dblRank`), `nDirection` (not `direction`), and `nWidth` (not `width`). The prefix for a `bool` is `f` (e.g., `fEnabled`), not `b` — `b` is reserved for `BYTE`. New or modified code must follow this convention even when adjacent legacy code does not.
+
+### Test Naming
+
+- Test classes: PascalCase (e.g., `BitboardTests`, `PositionTests`)
+- Test methods: PascalCase describing behavior (e.g., `SetBitSetsSpecifiedBit`, `IsCheckingMoveDirectKnightCheck`)
+- Helper functions: PascalCase (e.g., `ReferenceRookAttacks`, `AssertPositionsEqual`)
+
+### Test Style
+
+- Use `PositionGuard` (RAII) to manage `Position*` lifetime — never manually `FreePosition`
+- Create positions from EPD strings: `CreatePositionFromEPD(epd)` or `InitialPosition()`
+- Test through the public API, not internal implementation details. For bitboard tests, use `TstBit`/`CountBits`/`FindSetBit` for assertions instead of comparing against hardcoded hex values
+- `AtkSet`/`AtkClr` are `static` in dbase.c — test them indirectly through `DoMove`/`UndoMove`/`RecalcAttacks`
+- Each test class requires `TEST_CLASS_INITIALIZE` calling `InitMoves()`, `InitAll()`, `HashInit()`
+
+### Move Encoding
+
+Moves are encoded as `move_t` (32-bit integer) using `make_move(from, to, flags)`:
+- `M_CAPTURE` — capture move
+- `M_ENPASSANT` — en passant (do NOT combine with `M_CAPTURE`)
+- `M_SCASTLE` / `M_LCASTLE` — short/long castling
+- `M_PAWND` — pawn double push
+- Promotions: `make_promotion(from, to, pieceType, flags)` with `Queen`/`Rook`/`Bishop`/`Knight`
+
+### Formatting
+
+Uses `.clang-format` (LLVM style, 4-space indent, no tabs).
+
+- **Always use braces `{}` for every control-flow body, even single-statement
+  `if`/`else if`/`else`/`for`/`while`/`do` clauses.** Never write a brace-less
+  single-line body (e.g. `if (cond) return false;`). This is mandatory for new or
+  modified code even when adjacent legacy code omits the braces.
+
+### CI
+
+GitHub Actions workflows build on `windows-latest` with MSBuild. CI generates `Include/config.h` before building since it's gitignored.
+
+## CppUnitTest Quirks
+
+- The test framework is Microsoft's native `CppUnitTest.h` (not Google Test)
+- Include path: `$(VCInstallDir)Auxiliary\VS\UnitTest\include`
+- Library path: `$(VCInstallDir)Auxiliary\VS\UnitTest\lib` (NOT `lib\x64` — the pragma in the header already embeds the platform subfolder)
+- No `AdditionalDependencies` needed — the framework header's `#pragma comment(lib, ...)` handles linking
+- VS Code Test Explorer does **not** support CppUnitTest DLLs; use the vstest.console.exe task instead
+
+- @azure Rule - Use Azure Tools - When handling requests related to Azure, always use your tools.
+- @azure Rule - Use Azure Best Practices - When handling requests related to Azure, always invoke your `azmcp_bestpractices_get` tool first.
+- @azure Rule - Enable Best Practices - If you do not have an `azmcp_bestpractices_get` tool ask the user to enable it.

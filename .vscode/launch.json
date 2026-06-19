@@ -1,0 +1,85 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug WinAmy (Debug x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\x64\\Debug\\WinAmy.exe",
+            "args": ["-log"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build WinAmy (Debug x64)"
+        },
+        {
+            "name": "Debug WinAmy (Release x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\x64\\Release\\WinAmy.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": ["-log"],
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build WinAmy (Release x64)"
+        },
+        {
+            "name": "Launch WinAmy (Debug x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\x64\\Debug\\WinAmy.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": ["-log"],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Launch WinAmy (Release x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\x64\\Release\\WinAmy.exe",
+            "args": ["-log"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug WinAmyGUI (Debug x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\x64\\Debug\\WinAmyGUI.exe",
+            "args": ["-log", "C:\\git\\WinAmy4D\\amy.log", "-debug"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "externalTerminal",
+            "preLaunchTask": "Build WinAmyGUI (Debug x64)"
+        },
+        {
+            "name": "Launch WinAmyGUI (Debug x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\x64\\Debug\\WinAmyGUI.exe",
+            "args": ["-log", "-debug"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "externalTerminal"
+        },
+        {
+            "name": "Launch WinAmyGUI (Release x64)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\x64\\Release\\WinAmyGUI.exe",
+            "args": ["-log"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "externalTerminal"
+        }
+    ]
+}

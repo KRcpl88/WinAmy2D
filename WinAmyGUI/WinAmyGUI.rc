@@ -1,0 +1,71 @@
+#include "resource.h"
+#include <windows.h>
+
+IDR_MAINMENU MENU
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&New Game\tCtrl+N",   IDM_FILE_NEW
+        MENUITEM SEPARATOR
+        MENUITEM "&Load Game from EPD...", IDM_FILE_LOAD_EPD
+        MENUITEM "&Save Game to EPD...",   IDM_FILE_SAVE_EPD
+        MENUITEM SEPARATOR
+        MENUITEM "Load &Game from PGN4...", IDM_FILE_LOAD_PGN
+        MENUITEM "Save Game &to PGN4...",   IDM_FILE_SAVE_PGN
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit",               IDM_FILE_EXIT
+    END
+    POPUP "&Options"
+    BEGIN
+        POPUP "&Search Depth"
+        BEGIN
+            MENUITEM "&1",   IDM_DEPTH_1
+            MENUITEM "&2",   IDM_DEPTH_2
+            MENUITEM "&3",   IDM_DEPTH_3, CHECKED
+            MENUITEM "&4",   IDM_DEPTH_4
+            MENUITEM "&5",   IDM_DEPTH_5
+            MENUITEM "&6",   IDM_DEPTH_6
+            MENUITEM "&7",   IDM_DEPTH_7
+            MENUITEM "&8",   IDM_DEPTH_8
+            MENUITEM "&9",   IDM_DEPTH_9
+        END
+        POPUP "&Players"
+        BEGIN
+            MENUITEM "&0 Players (Engine self-play)", IDM_PLAYERS_0
+            MENUITEM "&1 Player (vs Engine)",         IDM_PLAYERS_1
+            MENUITEM "&2 Players (Human vs Human)",   IDM_PLAYERS_2, CHECKED
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Undo Move\tCtrl+Z",               IDM_UNDO, GRAYED
+        MENUITEM "&Suggest Move",                    IDM_SUGGEST, GRAYED
+        MENUITEM "&Recommend Strategy...",                     IDM_STRATEGY
+        POPUP "&Highlight Legal Moves"
+        BEGIN
+            MENUITEM "&White", IDM_HIGHLIGHT_WHITE
+            MENUITEM "&Black", IDM_HIGHLIGHT_BLACK
+        END
+        MENUITEM "&Pause Engine\tCtrl+P",             IDM_PAUSE, GRAYED
+    END
+    POPUP "&View"
+    BEGIN
+        MENUITEM "&2D Board\tCtrl+2", IDM_VIEW_2D, CHECKED
+        MENUITEM "&3D Board\tCtrl+3", IDM_VIEW_3D
+        MENUITEM SEPARATOR
+        POPUP "&Grid Type"
+        BEGIN
+            MENUITEM "&Full Dodecahedron",  IDM_GRID_FULL
+            MENUITEM SEPARATOR
+            MENUITEM "Square (&x/y plane)", IDM_GRID_SQUARE_Z, CHECKED
+            MENUITEM "Square (&z/x plane)", IDM_GRID_SQUARE_Y
+            MENUITEM "Square (&y/z plane)", IDM_GRID_SQUARE_X
+            MENUITEM SEPARATOR
+            MENUITEM "Hex &1 (-X,-Y,-Z)",   IDM_GRID_HEX_1
+            MENUITEM "Hex &2 (-X,-Y,+Z)",   IDM_GRID_HEX_2
+            MENUITEM "Hex &3 (-X,+Y,-Z)",   IDM_GRID_HEX_3
+            MENUITEM "Hex &4 (+X,-Y,-Z)",   IDM_GRID_HEX_4
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "Show &Gridlines",   IDM_VIEW_SHOW_GRIDLINES, GRAYED
+        MENUITEM "Reset &View",       IDM_VIEW_RESET_VIEW, GRAYED
+    END
+END

@@ -1,0 +1,253 @@
+# WinAmy Move Computation Design (Enumeration → Evaluation → Selection)
+
+This document describes how WinAmy computes the optimal move for the side to move, mapped to the 3 requested steps:
+
+1. Enumerating all possible moves from the current position  
+2. Evaluating and scoring each move  
+3. Choosing the best next move
+
+---
+
+## Main entry points and high-level flow
+
+Primary game-search entry points:
+
+- `CPosition::SearchRoot()` (`src/position.cpp:455`)  
+- `CPosition::Iterate()` (`src/position.cpp:374`)  
+- `IterateInt()` (internal iterative-deepening loop, `src/search.cpp:988`)
+
+High-level control:
+
+1. `SearchRoot()` optionally picks a book move (`SelectBook`), else clones the position and calls `Iterate()` (`src/position.cpp:462-479`).
+2. `Iterate()` does pre-search setup (time controls, legal move count, evaluation/hash init), creates `CSearchData`, then runs `IterateInt(sd)` (`src/position.cpp:381-432`).
+3. `IterateInt()` searches root moves depth-by-depth with `NegaScout()`/`Quies()` and stores final best move in `sd->m_BestMove` (`src/search.cpp:1007-1383`).
+
+---
+
+## 1 - Move Enumeration
+
+Strict legal generation at root (`LegalMoves` + `GenTo/GenFrom/GenEnpas` + legality filter), and phased incremental generation in search (`NextMove`/`NextEvasion`/`NextMoveQ`).
+
+### 1.1 Core classes/structs used
+
+- `CPosition` (`include/position.h:45`): board state, turn, attack maps, piece masks, move application/rollback methods.
+- `CMove` (`include/move.h:22`): move representation (from/to + flags: capture, castle, en passant, promotion, etc.).
+- `heap_t` move buffers: used to store generated moves.
+- `CSearchData` (`include/searchdata.h:72`) + `SSearchStatus` (`include/searchdata.h:57`): per-search generator phase state (`SearchPhase` enum).
+
+### 1.2 Legal move enumeration at root
+
+At search start, `Iterate()` first checks legal move count:
+
+- `p->LegalMoves(heap)` (`src/position.cpp:390`)
+- If 0: mate/stalemate early return (`src/position.cpp:401-407`)
+- If 1: forced move early return (`src/position.cpp:408-413`)
+
+`CPosition::LegalMoves()` (`src/dbase.cpp:2426`) calls `legal_moves_internal()` (`src/dbase.cpp:2359`) which:
+
+1. Generates candidate captures using `GenTo()` for each enemy-occupied target square (`src/dbase.cpp:2362-2382`).
+2. Generates candidate non-captures using `GenFrom()` for each own piece square (`src/dbase.cpp:2384-2407`).
+3. Generates en-passant candidates via `GenEnpas()` (`src/dbase.cpp:2409-2423`).
+4. Filters for strict legality by:
+   - `DoMove(move)`
+   - `!InCheck(OPP(m_nTurn))` test
+   - `UndoMove(move)`  
+   (`src/dbase.cpp:2374-2378`, `2399-2403`, `2416-2420`)
+
+So enumeration is not just pseudo-legal generation; final root move list is strictly legal.
+
+### 1.3 Incremental move enumeration inside tree search
+
+Inside `NegaScout()`, moves are not generated all at once; they are produced incrementally:
+
+- `move = incheck ? sd->NextEvasion() : sd->NextMove()` (`src/search.cpp:652`)
+
+`CSearchData::NextMove()` (`src/search_data.cpp:159`) is a **search-ordering iterator** over legal candidates for normal nodes. It does not define piece geometry (for example, “bishop moves diagonally”); that geometry is precomputed elsewhere and consumed by lower-level generators. `NextMove()` controls *when* each move class is produced so alpha-beta can cut quickly:
+
+1. `HashMove`
+2. `GenerateCaptures`
+3. `GainingCapture` (SEE/`SwapOff` >= 0)
+4. `Killer1`, `Killer2`
+5. `CounterMv`
+6. `Killer3`
+7. `LoosingCapture`
+8. `GenerateRest` (quiet moves + castling + pawn pushes)
+9. `HistoryMoves`  
+(`SearchPhase` in `include/searchdata.h:41-55`, logic in `src/search_data.cpp:166-454`)
+
+`NextEvasion()` (`src/search_data.cpp:456`) is the in-check companion iterator. It uses similar staging but limits candidates to legal evasions (king moves, captures of the checking piece, and interpositions when applicable).
+
+`NextMoveQ()` (`src/search_data.cpp:920`) is the quiescence iterator. It is tactical-only (primarily captures/check continuations) and is built from `GenerateQCaptures()` (`src/search_data.cpp:761`) so `Quies()` searches forcing lines rather than all quiet continuations.
+
+### 1.4 Low-level generators
+
+- `GenTo(square, heap)` capture generation to a target (`src/dbase.cpp:1177-1199`)
+- `GenFrom(square, heap)` non-capture generation from a piece square (`src/dbase.cpp:1220-1290`)
+- `GenEnpas(heap)` en-passant generation (`src/dbase.cpp:1201-1214`)
+- `MayCastle(move)` validates castling path/attack conditions (`src/dbase.cpp:1296-1347`)
+
+These are built on precomputed attack maps in `CPosition` (`m_rgAtkTo`, `m_rgAtkFr`) and piece masks (`m_rgMask`).
+
+### 1.5 Piece-move geometry and special-move rules in the pipeline
+
+`GenTo` and `GenFrom` are `CPosition` methods (declared in `include/position.h`, implemented in `src/dbase.cpp`) that convert attack/mask information into move objects.  
+After the refactor, attack geometry is computed at runtime using `ATTACK_DELTA` and `CSCoord::Step`, and `magic.cpp`/magic-table lookup is removed.
+
+Current geometry sources and attack flow:
+
+- Piece direction tables are defined as `ATTACK_DELTA` with per-piece counts in `ATTACK_DELTA_COUNT` (`include/dbase.h`, `src/dbase.cpp`).
+- `ComputeSlidingAttacks(const CSCoord&, int, const CBitBoard&)` ray-walks each piece direction with repeated `Step(dir)` until off-board (`!IsValid()`) or blocked (`occupied.TstBit(...)`) (`src/dbase.cpp`).
+- `ComputeLeapAttacks(const CSCoord&, int)` applies single-step deltas for non-sliding pieces (`src/dbase.cpp`).
+- `AtkSet(...)` selects the model per piece:
+  - pawn/knight/king → `ComputeLeapAttacks`
+  - bishop/rook/queen → `ComputeSlidingAttacks`
+  and writes the result into `m_rgAtkTo` / `m_rgAtkFr` (`src/dbase.cpp`).
+- `GenTo`/`GenFrom`/`LegalMoves` then enumerate candidates from these attack maps and enforce strict legality via `DoMove` + `!InCheck` + `UndoMove`.
+
+#### How attack computation now works for a specific `CPosition`
+
+For a piece on square `sq` in position `p`:
+
+1. `AtkSet` computes `occupied = p->m_rgMask[0][0] | p->m_rgMask[1][0]`.
+2. It dispatches to `ComputeLeapAttacks` (pawn/knight/king) or `ComputeSlidingAttacks` (bishop/rook/queen).
+3. `ComputeSlidingAttacks` iterates each direction from `ATTACK_DELTA[pieceType]`, stepping square-by-square with `CSCoord::Step(dir)`:
+   - stop when `Step` yields an invalid square (board edge / invalid transition),
+   - include each valid square in attacks,
+   - stop ray on first occupied square.
+4. `ComputeLeapAttacks` steps once per direction and includes only valid destinations.
+5. `AtkSet` stores attacks in `m_rgAtkTo[sq]` and updates reverse map `m_rgAtkFr[*]`.
+6. Move generators apply side/occupancy constraints and legal filtering as before.
+
+#### Queen legal-move generation after the refactor
+
+Queen attacks are now generated directly by `ComputeSlidingAttacks(squareCoord, Queen, occupied)` using the queen rows in `ATTACK_DELTA`, rather than by unioning magic bishop/rook tables.
+
+That attack set is consumed by the normal generation and legality pipeline (`GenTo`/`GenFrom`, then `DoMove`/`InCheck`/`UndoMove`), so final queen moves remain strictly legal.
+
+Special rules are integrated into the same generation/legality/application pipeline rather than a separate subsystem:
+
+- Promotion candidates are emitted in `GenTo`/`GenFrom` using `make_promotion(...)` and `is_promo_square(...)` (`src/dbase.cpp:1186-1193`, `1263-1268`, `include/inline.h:120-138`), then materialized/reverted in `DoMove`/`UndoMove` via `PromoType(...)` (`src/dbase.cpp:787-802`, `908-923`).
+- Castling candidates are produced in `GenFrom` and search `GenerateRest` (`src/dbase.cpp:1239-1251`, `src/search_data.cpp:354-363`), validated by `MayCastle` (`src/dbase.cpp:1296-1347`), and applied/reverted through `DoCastle`/`UndoCastle` from `DoMove`/`UndoMove` (`src/dbase.cpp:541-601`, `607-658`, `679-681`, `892-893`).
+- Pawn two-square advances (`M_PAWND`) are computed with blocker checks in both root and staged generators:
+  - Root legal list path: `GenFrom` first requires the one-step square to be empty, then requires the two-step square to be empty before appending `M_PAWND` (`src/dbase.cpp:1276-1286`).
+  - Search staged path: `GenerateRest` and `NextEvasion` do the same in bitboard form by shifting one rank, masking with `empty`, restricting to start-rank pawns (`ThirdRank`), shifting again, then masking with `empty` before appending `M_PAWND` (`src/search_data.cpp:378-408`, `685-721`).
+  - Final legality guard: `LegalMove` rechecks midpoint and destination emptiness for `move.IsPawnDoublePush()` (`src/dbase.cpp:1430-1445`).
+- En-passant is generated by `GenEnpas` (`src/dbase.cpp:1201-1214`), checked in `LegalMove` (`src/dbase.cpp:1391-1406`), and applied/reverted in `DoMove`/`UndoMove` (`src/dbase.cpp:747-778`, `945-971`), with EP-target state set on pawn double pushes (`src/dbase.cpp:830-836`).
+
+---
+
+## 2 — Evaluating and scoring each move
+
+WinAmy scores moves using recursive search scores (primary), with static evaluation used at quiescence leaves and additional heuristic scoring for ordering/pruning.
+
+ - Recursive alpha-beta/Negascout scoring (`NegaScout`), quiescence tactical scoring (`Quies`), static position evaluation (`EvaluatePosition`), plus move-ordering heuristics (SEE, killer/history/counter).
+
+### 2.1 Core classes/structs used
+
+- `CSearchData`: search state and scoring context:
+  - killer/history/counter tables (`m_pKillerTable`, `m_rguHistoryTab`, `m_rgCounterTab`)
+  - principal variation scratch (`m_rgPvSave`)
+  - search metrics and result fields (`m_nBestScore`, `m_BestMove`)  
+  (`include/searchdata.h:73-107`)
+- `CPosition`: mutable position searched via `DoMove`/`UndoMove`.
+- `PawnFacts` (`include/evaluation.h:39`) and evaluation hash tables used by `EvaluatePosition`.
+
+The killer-move heuristic is one of these ordering tools: a **non-tactical move** that previously caused a **beta cutoff** at the same ply is stored in `SKillerEntry` (`killer1`/`killer2` + hit counters in `include/searchdata.h:63-66`) via `CSearchData::PutKiller` (`src/search_data.cpp:974-1003`). On later sibling nodes at that ply, the move is tried early in `Killer1`/`Killer2`/`Killer3` phases (`src/search_data.cpp:248-316`, `539-601`) to increase pruning efficiency.
+
+### 2.2 Recursive scoring in full search (`NegaScout`)
+
+`CSearchData::NegaScout()` (`src/search.cpp:406`) computes move scores by:
+
+1. Node prechecks: termination (`TerminateSearch`), depth, repetition, in-check extension (`src/search.cpp:439-465`).
+2. TT probe (`ProbeHT`) for exact/bound hits (`src/search.cpp:475-499`).
+3. Optional EGTB/recognizer probes (`src/search.cpp:515-543`).
+4. Optional null-move pruning (`src/search.cpp:545-605`).
+5. Iterate legal candidates from `NextMove`/`NextEvasion` (`src/search.cpp:652`).
+6. For each candidate:
+   - apply dynamic extensions/reductions (recapture, passed pawn, check, futility)
+   - `DoMove`
+   - reject illegal resulting positions (`InCheck(OPP(m_nTurn))`)
+   - recurse (`NegaScout` or `Quies`)
+   - `UndoMove`  
+   (`src/search.cpp:652-919`)
+7. Handle beta cutoffs and update killer/counter/history via:
+   - `PutKiller`
+   - `StoreResult`  
+   (`src/search.cpp:816-883`)
+
+`ScoreMove()` (`src/position.cpp:252`) provides optimistic tactical values used by futility pruning (`src/search.cpp:695-744`), not final evaluation.
+
+### 2.3 Quiescence scoring (`Quies`)
+
+`CSearchData::Quies()` (`src/search.cpp:314`) evaluates tactical continuations when full depth is exhausted:
+
+1. Enter node, depth/repetition checks (`src/search.cpp:328-330`).
+2. Recognizer probe, else static evaluation `EvaluatePosition(p)` (`src/search.cpp:340-359`).
+3. If needed, search tactical replies from `NextMoveQ(alpha)` recursively (`src/search.cpp:367-385`).
+
+### 2.4 Static evaluation (`EvaluatePosition`)
+
+`EvaluatePosition()` (`src/evaluation.cpp:2624`) returns side-to-move-correct signed score, delegating to `EvaluatePositionForWhite()` (`src/evaluation.cpp:2112`).
+
+Main components in `EvaluatePositionForWhite()` include:
+
+- Material (`MaterialBalance`, `src/evaluation.cpp:2102`)
+- Pawn structure (`EvaluatePawnsHashed`)
+- King safety (`EvaluateKingSafety`)
+- Passed pawns (`EvaluatePassedPawns`)
+- Development and piece-specific terms (knight/bishop/rook/queen/king PST and mobility)  
+(`src/evaluation.cpp:2130-2615`)
+
+How PSTs are interpreted and applied in this step:
+
+- PST values are positional centipawn-like bonuses/penalties indexed by square for each piece type (`KnightPos`, `BishopPos`, `RookPos`, `QueenPos`, king PST variants, and pawn PST tables).
+- A **positive PST entry** means “good square for that piece from White’s perspective”; a **negative entry** means “bad square.”
+- White piece contribution: PST value is added to the running score.
+- Black piece contribution: the engine uses `sq.ReflectRank()` to map Black squares onto the same White-oriented PST, then subtracts that value, yielding a symmetric White-minus-Black positional term.
+- Because score is computed in `EvaluatePositionForWhite()`, the position score is first “White POV”; `EvaluatePosition()` then flips sign when Black is to move, so final output is always side-to-move relative.
+
+How PST values affect the final static evaluation:
+
+- Material and structure terms are accumulated first, then piece-position terms are added/subtracted piece-by-piece.
+- Knight/queen PST terms are applied directly (`score +=/-= KnightPos[...]`, `QueenPos[...]`).
+- Bishop/rook PST terms are phase-weighted (`ScaleUp[phase]`), so their PST impact increases/decreases with game phase rather than being constant.
+- King uses blended PSTs: middlegame king table and an endgame king table are mixed with `ScaleUp/ScaleDown` based on phase, so king placement preferences shift smoothly from safety (middlegame) toward activity/centralization (endgame).
+- Pawn PST tables (`WPawnPos`, `BPawnPos`) are initialized in `InitEvaluation()` using current king placement/castling context and then consumed in pawn evaluation; this makes pawn-square bonuses context-sensitive, not static constants.
+
+In short, PSTs provide the “where the pieces stand” component of static eval: each piece’s square contributes a signed positional value, and the sum of these values (with phase/context scaling) directly shifts the final evaluation up or down.
+
+Pre-search eval setup:
+
+- `InitEvaluation(p)` called in `Iterate()` and `QuiescenceSearch()` (`src/position.cpp:421`, `src/position.cpp:505`)
+- builds phase-sensitive pawn/king PST context and clears pawn hash (`src/evaluation.cpp:2635-2745`).
+
+---
+
+## 3 — Choosing the best next move
+
+Iterative deepening root loop (`IterateInt`) with aspiration windows, PV updates, and root move resorting; final best move is `mvs[0]` copied to `m_BestMove` and applied in `SearchRoot`.
+
+### 3.1 Root best-move selection loop
+
+In `IterateInt()` (`src/search.cpp:988`):
+
+1. Build root legal move list once:
+   - `sd->m_wRootMoves = p->LegalMoves(sd->m_hHeap)` (`src/search.cpp:1007`)
+2. For each iterative depth (`m_wDepth`) and each root move (`m_wMoveNum`):
+   - search move score by calling `NegaScout` or `Quies` (`src/search.cpp:1024-1062`)
+   - perform aspiration-window fail-low/fail-high re-search when needed (`src/search.cpp:1071-1229`)
+   - update PV info, `m_nBestScore`, and analysis lines (`src/search.cpp:1200-1229`)
+3. Reorder root moves for next iteration via `ResortMovesList` (`src/search.cpp:1269`, defined at `957`).
+4. Finalize selected move:
+   - `sd->m_BestMove = mvs[0]` (`src/search.cpp:1376`)
+
+So, the “best move” is the head of the root list after iterative deepening + reordering + aspiration re-search convergence.
+
+### 3.2 Returning and playing the chosen move
+
+- `Iterate()` copies out `sd->m_BestMove` and `sd->m_nBestScore`, then returns it (`src/position.cpp:434-449`).
+- `SearchRoot()` receives the move and executes it on the actual game position with `p->DoMove(move)` (`src/position.cpp:482-494`).
+
+Because `DoMove()` toggles `m_nTurn` (`src/dbase.cpp:873`), the same pipeline computes "best move for each side" naturally on alternating turns.
+
+  
