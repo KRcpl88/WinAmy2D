@@ -101,25 +101,23 @@ inline int AxisIndex(D3DBoardRenderer::EAxis eAxis) {
     return static_cast<int>(eAxis);
 }
 
-// Anchor cells for the +x / +y / +z axis labels. These are fixed *true* board
+// Anchor cells for the +x / +y axis labels. These are fixed *true* board
 // squares (CellCenter applies any active axis swap/inversion, so the labels
 // follow the board when the 3D view is reoriented):
-//   +x → ha8 (level h, file a, rank 8)
-//   +y → hh8 (level h, file h, rank 8)
-//   +z → oa1 (level o, file a, rank 1)
+//   +x → h8 (level 0, file 7, rank 7) — top-right corner
+//   +y → a8 (level 0, file 0, rank 7) — top-left corner
 struct AxisLabelCell {
     uint16_t level;
     uint16_t file;
     uint16_t rank;
     int      column; // column in the axis-label texture atlas
 };
-constexpr AxisLabelCell kAxisLabelCells[3] = {
-    {  7, 0, 7, 0 }, // ha8 -> +x
-    {  7, 7, 7, 1 }, // hh8 -> +y
-    { 14, 0, 0, 2 }, // oa1 -> +z
+constexpr AxisLabelCell kAxisLabelCells[2] = {
+    { 0, 7, 7, 0 }, // h8 -> +x
+    { 0, 0, 7, 1 }, // a8 -> +y
 };
-constexpr int kAxisLabelCols = 3;
-const wchar_t* const kAxisLabelText[kAxisLabelCols] = { L"+x", L"+y", L"+z" };
+constexpr int kAxisLabelCols = 2;
+const wchar_t* const kAxisLabelText[kAxisLabelCols] = { L"+x", L"+y" };
 constexpr int kAxisLabelCellPixels = 128;
 } // namespace
 

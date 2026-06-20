@@ -120,7 +120,7 @@ private:
     HWND m_hBtnZoomOut    = nullptr;
     HWND m_hBtnRotateGrid = nullptr;
 
-    // Shared toolbar x-origin for the grid-type (3D) dropdown.
+    // Shared toolbar x-origin for the grid-type dropdown.
     int  m_nDropdownX    = 0;
 
     // ---- Owned subsystems (group B) ------------------------------------
