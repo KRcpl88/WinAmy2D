@@ -35,12 +35,10 @@
 #include <assert.h>
 
 static void test_parse_san_promotions(void) {
-    /* 3D EPD: all levels empty except level 'h' (level 7), which has a white
-     * pawn on ha7, white king on he8, and black king on hg8. */
+    /* Single 8x8 board: white pawn on ha7, white king on he8, black king on
+     * hg8 (named with the legacy 'h' prefix that now maps to level 0). */
     CPosition *p = CPosition::CreateFromEPD(
-        "1|2/2|3/3/3|4/4/4/4|5/5/5/5/5|6/6/6/6/6/6|7/7/7/7/7/7/7"
-        "|4K1k1/P7/8/8/8/8/8/8"
-        "|7/7/7/7/7/7/7|6/6/6/6/6/6|5/5/5/5/5|4/4/4/4|3/3/3|2/2|1 w - -");
+        "4K1k1/P7/8/8/8/8/8/8 w - -");
 
     CMove move = p->ParseSAN("ha8=Q");
     assert(move == make_promotion(ha7, ha8, Queen, 0));

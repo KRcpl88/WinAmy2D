@@ -155,6 +155,7 @@ static const int16_t KnightOutpostL7[64] = {
 // clang-format on
 
 int16_t KnightPos[CBitBoard::SIZE] = {
+    /* Single 8x8 board (level 0) */
      -30,  -30,  -30,  -30,  -30,  -30,  -30,  -30,
      -30,  -30,   60,   60,   60,   60,  -30,  -30,
      -30,   60,  130,  130,  130,  130,   60,  -30,
@@ -165,6 +166,7 @@ int16_t KnightPos[CBitBoard::SIZE] = {
        0,    0,    0,    0,    0,    0,    0,    0
 };
 int16_t KnightOutpost[CBitBoard::SIZE] = {
+    /* Single 8x8 board (level 0) */
        0,    0,    0,    0,    0,    0,    0,    0,
        0,    0,    0,    0,    0,    0,    0,    0,
        0,    0,    0,    0,    0,    0,    0,    0,
@@ -202,6 +204,7 @@ static const int16_t BishopPosL7[64] = {
 // clang-format on
 
 int16_t BishopPos[CBitBoard::SIZE] = {
+    /* Single 8x8 board (level 0) */
       60,   60,   60,   60,   60,   60,   60,   60,
       60,  250,   60,   60,   60,   60,  250,   60,
       60,  160,  160,  160,  160,  160,  160,   60,
@@ -242,6 +245,7 @@ static const int16_t RookPosL7[64] = {
 // clang-format on
 
 int16_t RookPos[CBitBoard::SIZE] = {
+    /* Single 8x8 board (level 0) */
        0,   90,  130,  220,  220,  130,   90,    0,
        0,    0,    0,    0,    0,    0,    0,    0,
        0,    0,    0,    0,    0,    0,    0,    0,
@@ -283,6 +287,7 @@ static const int16_t QueenPosDevelopmentL7[64] = {
 // clang-format on
 
 int16_t QueenPos[CBitBoard::SIZE] = {
+    /* Single 8x8 board (level 0) */
        0,    0,    0,    0,    0,    0,    0,    0,
        0,   30,   30,   30,   30,   30,   30,    0,
        0,   30,   60,   60,   60,   60,   30,    0,
@@ -293,6 +298,7 @@ int16_t QueenPos[CBitBoard::SIZE] = {
        0,    0,    0,    0,    0,    0,    0,    0
 };
 int16_t QueenPosDevelopment[CBitBoard::SIZE] = {
+    /* Single 8x8 board (level 0) */
     -200, -200,    0,    0,    0,    0, -200, -200,
     -200, -200,   30,   30,   30,    0, -200, -200,
     -200, -200,    0,    0,    0,    0, -200, -200,
@@ -344,6 +350,7 @@ static const int16_t KingPosEndgameQueenSideL7[64] = {
 // clang-format on
 
 int16_t KingPosMiddlegame[CBitBoard::SIZE] = {
+    /* Single 8x8 board (level 0) */
     -100,    0, -200, -300, -300, -200,    0, -100,
     -100, -100, -200, -300, -300, -200, -100, -100,
     -300, -300, -300, -300, -300, -300, -300, -300,
@@ -354,6 +361,7 @@ int16_t KingPosMiddlegame[CBitBoard::SIZE] = {
     -800, -800, -800, -800, -800, -800, -800, -800
 };
 int16_t KingPosEndgame[CBitBoard::SIZE] = {
+    /* Single 8x8 board (level 0) */
     -300, -300, -300, -300, -300, -300, -300, -300,
     -300, -200, -100, -100, -100, -100, -200, -300,
     -300, -100,    0,  100,  100,    0, -100, -300,
@@ -364,6 +372,7 @@ int16_t KingPosEndgame[CBitBoard::SIZE] = {
     -300, -300, -300, -300, -300, -300, -300, -300
 };
 int16_t KingPosEndgameQueenSide[CBitBoard::SIZE] = {
+    /* Single 8x8 board (level 0) */
     -300, -300, -300, -300, -300, -400, -500, -600,
     -100, -100, -100, -100, -100, -200, -300, -600,
        0,  100,  100,    0, -100, -200, -300, -600,
@@ -1963,10 +1972,10 @@ void InitEvaluation(const CPosition *p) {
         }
     }
 
-    WPawnPos[CSCoord(7, 3, 1).BitOffset()] += CrampingPawn;  /* d2 */
-    WPawnPos[CSCoord(7, 4, 1).BitOffset()] += CrampingPawn;  /* e2 */
-    BPawnPos[CSCoord(7, 3, 6).BitOffset()] += CrampingPawn;  /* d7 */
-    BPawnPos[CSCoord(7, 4, 6).BitOffset()] += CrampingPawn;  /* e7 */
+    WPawnPos[CSCoord(0, 3, 1).BitOffset()] += CrampingPawn;  /* d2 */
+    WPawnPos[CSCoord(0, 4, 1).BitOffset()] += CrampingPawn;  /* e2 */
+    BPawnPos[CSCoord(0, 3, 6).BitOffset()] += CrampingPawn;  /* d7 */
+    BPawnPos[CSCoord(0, 4, 6).BitOffset()] += CrampingPawn;  /* e7 */
 
     ClearPawnHashTable();
 

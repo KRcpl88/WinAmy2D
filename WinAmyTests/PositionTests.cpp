@@ -285,24 +285,20 @@ TEST_CLASS(PositionTests) {
         PositionGuard position(CPosition::Initial());
 
         int count = position.get()->LegalMoves(NULL);
-        Assert::AreEqual(57, count);
+        Assert::AreEqual(20, count);
     }
 
     TEST_METHOD(LegalMovesInitialPositionAllPieceMovesPresent) {
-        // Verify every expected legal move from the 4D opening position is present
-        // in the output of LegalMoves.  The 57 moves break down as:
-        //   Main board (h, 8x8)  : 8 pawns × 2 (push+double) + 2 knights × 3 = 22
-        //   Level g (6, 7x7)     : 7 pawns × 1 (single push, not at homeRank) = 7
-        //   Level i (8, 7x7)     : 7 pawns × 1 (single push; double push is
-        //                          only legal on level h) + knights (7 + 8
-        //                          moves incl. cross-level) = 22
-        //   Level j (9, 6x6)     : 6 pawns × 1 (single push, not at homeRank) = 6
+        // Verify every expected legal move from the standard opening position is
+        // present in the output of LegalMoves.  The 20 moves break down as:
+        //   8 pawns × 2 (single push + double push) = 16
+        //   2 knights × 2 (b1->a3/c3, g1->f3/h3)    = 4
         PositionGuard position(CPosition::Initial());
 
         // Collect all fully-legal moves into a heap, then index by (from, to) offsets.
         heap_t heap = allocate_heap();
         const int count = position.get()->LegalMoves(heap);
-        Assert::AreEqual(57, count);
+        Assert::AreEqual(20, count);
 
         std::set<std::pair<uint16_t, uint16_t>> legalSet;
         for (unsigned int i = heap->current_section->start;
@@ -318,123 +314,54 @@ TEST_CLASS(PositionTests) {
                 L"Expected legal move not found in LegalMoves output");
         };
 
-        // --- Main board (level h = 7): 22 moves ---
-
-        // 8 white pawns on rank 1 (ha2–hh2): single push to rank 2, double push to rank 3.
+        // 8 white pawns on rank 1 (a2–h2): single push to rank 2, double push to rank 3.
         for (uint16_t file = 0; file < 8; file++) {
             CSCoord from(MAIN_LEVEL, file, 1);
             AssertPresent(from, CSCoord(MAIN_LEVEL, file, 2)); // single push
             AssertPresent(from, CSCoord(MAIN_LEVEL, file, 3)); // double push (M_PAWND)
         }
-        // Knight hb1 (file=1, rank=0): ha3, hc3 on main board + gc2 on level g.
+
+        // Knight b1 (file=1, rank=0): a3, c3.
         CSCoord hb1(MAIN_LEVEL, 1, 0);
-        AssertPresent(hb1, CSCoord(MAIN_LEVEL, 0, 2)); // ha3
-        AssertPresent(hb1, CSCoord(MAIN_LEVEL, 2, 2)); // hc3
-        AssertPresent(hb1, CSCoord(6, 2, 1));           // gc2
+        AssertPresent(hb1, CSCoord(MAIN_LEVEL, 0, 2)); // a3
+        AssertPresent(hb1, CSCoord(MAIN_LEVEL, 2, 2)); // c3
 
-        // Knight hg1 (file=6, rank=0): hf3, hh3 on main board + ge2 on level g.
+        // Knight g1 (file=6, rank=0): f3, h3.
         CSCoord hg1(MAIN_LEVEL, 6, 0);
-        AssertPresent(hg1, CSCoord(MAIN_LEVEL, 5, 2)); // hf3
-        AssertPresent(hg1, CSCoord(MAIN_LEVEL, 7, 2)); // hh3
-        AssertPresent(hg1, CSCoord(6, 4, 1));           // ge2
-
-        // --- Level g (index 6, 7x7): 7 moves ---
-        // 7 white pawns on rank 0 (ga1–gg1).
-        // Rank 0 ≠ homeRank (1) so no double push is available; single push only.
-        for (uint16_t file = 0; file < 7; file++) {
-            AssertPresent(CSCoord(6, file, 0), CSCoord(6, file, 1));
-        }
-
-        // --- Level i (index 8, 7x7): 22 moves ---
-        // 7 white pawns on rank 1 (ia2–ig2).
-        // Rank 1 == homeRank, but the two-square double push is only allowed on
-        // level h, so each of these pawns has a single push only.
-        for (uint16_t file = 0; file < 7; file++) {
-            CSCoord from(8, file, 1);
-            AssertPresent(from, CSCoord(8, file, 2)); // single push to rank 2
-        }
-        // Knight ib1 (file=1, rank=0): 2 same-level + 5 cross-level jumps.
-        CSCoord ib1(8, 1, 0);
-        AssertPresent(ib1, CSCoord(8, 0, 2));          // ia3
-        AssertPresent(ib1, CSCoord(8, 2, 2));          // ic3
-        AssertPresent(ib1, CSCoord(9, 2, 1));          // jc2 (level j)
-        AssertPresent(ib1, CSCoord(5, 0, 0));          // fa1 (level f)
-        AssertPresent(ib1, CSCoord(5, 1, 0));          // fb1 (level f)
-        AssertPresent(ib1, CSCoord(MAIN_LEVEL, 0, 2)); // ha3 (main board)
-        AssertPresent(ib1, CSCoord(MAIN_LEVEL, 3, 2)); // hd3 (main board)
-
-        // Knight ie1 (file=4, rank=0): 2 same-level + 5 cross-level jumps.
-        CSCoord ie1(8, 4, 0);
-        AssertPresent(ie1, CSCoord(8, 3, 2));          // id3
-        AssertPresent(ie1, CSCoord(8, 5, 2));          // if3
-        AssertPresent(ie1, CSCoord(9, 2, 1));          // jc2 (level j)
-        AssertPresent(ie1, CSCoord(5, 3, 0));          // fd1 (level f)
-        AssertPresent(ie1, CSCoord(5, 4, 0));          // fe1 (level f)
-        AssertPresent(ie1, CSCoord(MAIN_LEVEL, 3, 2)); // hd3 (main board)
-        AssertPresent(ie1, CSCoord(MAIN_LEVEL, 6, 2)); // hg3 (main board)
-
-        // --- Level j (index 9, 6x6): 6 moves ---
-        // 6 white pawns on rank 0 (ja1–jf1).
-        // Rank 0 ≠ homeRank (1) so single push only.
-        for (uint16_t file = 0; file < 6; file++) {
-            AssertPresent(CSCoord(9, file, 0), CSCoord(9, file, 1));
-        }
+        AssertPresent(hg1, CSCoord(MAIN_LEVEL, 5, 2)); // f3
+        AssertPresent(hg1, CSCoord(MAIN_LEVEL, 7, 2)); // h3
     }
 
     TEST_METHOD(LegalMovesKingAloneInCorner) {
-        // King on ha1, enemy king far away
+        // King on a1, enemy king far away
         char epd[] = "4k3/8/8/8/8/8/8/K7 w - -";
         PositionGuard position(CreatePositionFromLegacyMainEPD(epd));
 
         int count = position.get()->LegalMoves(NULL);
-        Assert::AreEqual(5, count);
+        Assert::AreEqual(3, count);
     }
 
     // --- Generator / validator consistency ---
 
     TEST_METHOD(LegalMovesAreAcceptedByLegalMove) {
-        // Regression for a self-play stall: the bulk generator (LegalMoves)
-        // emitted a black pawn capture gc6xeb5, but the single-move validator
-        // (LegalMove) rejected it, because eb5 is the last rank of level e
-        // (index 4, width 5) and level e is not a promotion level.  A pawn may
-        // only land on an edge rank by promoting, which is allowed only on
-        // levels f–j.  The generator/validator disagreement made the engine
-        // pick a move the GUI's LegalMove guard refused to apply, stalling play.
+        // Every move the bulk generator (LegalMoves) produces must also pass the
+        // single-move validator (LegalMove); otherwise the engine can select a
+        // move that cannot actually be applied.
         const char *epd =
-            "1|2/2|3/3/3|2R1/4/4/4|1R3/5/5/5/5|6/6/6/6/6/6|1p1pppp/p1p4/7/7/7/4P2/1PPP1P1|"
-            "1r2r1k1/ppp2ppp/3pn3/8/8/4P1P1/PPP2P2/2K5|3r3/pR4R/3pp2/7/3PP2/P1P4/7|"
-            "pppp1p/6/6/6/6/PPP1P1|5/5/5/5/5|4/4/3q/4|3/3/3|2/2|1 b - -";
+            "1r2r1k1/ppp2ppp/3pn3/8/8/4P1P1/PPP2P2/2K5 b - -";
         PositionGuard position(CPosition::CreateFromEPD(epd));
         CPosition *p = position.get();
-
-        const CSCoord gc6(6, 2, 5);
-        const CSCoord eb5(4, 1, 4);
-        const uint16_t gc6off = gc6.BitOffset();
-        const uint16_t eb5off = eb5.BitOffset();
 
         heap_t heap = allocate_heap();
         p->LegalMoves(heap);
 
-        bool foundIllegalPawnCapture = false;
         for (unsigned int i = heap->current_section->start;
              i < heap->current_section->end; i++) {
             CMove move = heap->data[i];
-
-            // Every move the bulk generator produces must also pass the
-            // single-move validator; otherwise the engine can select a move
-            // that cannot actually be applied.
             Assert::IsTrue(p->LegalMove(move) != 0,
                 L"LegalMoves produced a move rejected by LegalMove");
-
-            if (move.GetFromCoord().BitOffset() == gc6off &&
-                move.GetToCoord().BitOffset() == eb5off) {
-                foundIllegalPawnCapture = true;
-            }
         }
         free_heap(heap);
-
-        Assert::IsFalse(foundIllegalPawnCapture,
-            L"Pawn capture onto a non-promotion edge rank must not be generated");
     }
 
     TEST_METHOD(LegalMovesNeverCapturesAKing) {
@@ -443,12 +370,9 @@ TEST_CLASS(PositionTests) {
         // en prise.  GenTo (and GenFrom) would then emit a pseudo-legal
         // capture of that king, which DoMove traps as an illegal state.
         // LegalMoves must skip king captures so the GUI can enumerate legal
-        // destinations without crashing.
-        const char *epd =
-            "1|2/2|3/3/3|4/4/4/4|5/5/5/5/5|6/6/6/6/6/6|ppppppp/7/7/7/7/7/PPPPPPP|"
-            "rnbqkb1r/pppppppp/5n2/8/8/5N2/PPPPPPPP/RNBQKB1R|"
-            "r1bq1br/pppppNp/7/7/1n3N1/PPPPPPP/R1BQ1BR|"
-            "pppppp/5n/6/6/6/PPPPPP|5/5/5/5/5|4/4/4/4|3/3/3|2/2|1 b KQkq -";
+        // destinations without crashing.  Here the white queen on b7 attacks
+        // the black king on a8 with white to move.
+        const char *epd = "k7/1Q6/8/8/8/8/8/7K w - -";
         PositionGuard position(CPosition::CreateFromEPD(epd));
         CPosition *p = position.get();
 
@@ -540,21 +464,16 @@ TEST_CLASS(PositionTests) {
 
     // A castling right is only valid when the matching king and rook actually
     // occupy their home squares.  This EPD declares white rights "KQ" but the
-    // white king sits on level 'a' (the leading "K" field) with no rook on the
-    // main-level corners, so the rights are inconsistent with the board.
+    // white king sits on e2 (not its e1 home square), so the rights are
+    // inconsistent with the board.
     static const char *InvalidCastlingEpd() {
-        return "K|2/2|3/3/3|4/4/4/4|5/3Q1/5/5/n4|6/6/6/6/6/6|7/7/7/7/7/7/7|"
-               "8/8/8/8/8/8/2R5/8|7/7/7/7/7/7/7|6/6/6/6/6/6|5/5/5/5/5|"
-               "4/4/4/4|n2/3/r2|bb/2|k w KQ -";
+        return "rnbqkbnr/pppppppp/8/8/8/8/PPPPKPPP/RNBQ1BNR w KQ -";
     }
 
     // The standard initial position declares "KQkq" with kings on e1/e8 and
     // rooks on a1/h1/a8/h8, so every castling right is consistent.
     static const char *ValidCastlingEpd() {
-        return "1|2/2|3/3/3|4/4/4/4|5/5/5/5/5|6/6/6/6/6/6|ppppppp/7/7/7/7/7/"
-               "PPPPPPP|rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR|"
-               "rnbqnbr/ppppppp/7/7/7/PPPPPPP/RNBQNBR|pppppp/6/6/6/6/PPPPPP|"
-               " w KQkq -";
+        return "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -";
     }
 
     TEST_METHOD(IsValidEPDRejectsInconsistentCastlingRights) {

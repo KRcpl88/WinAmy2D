@@ -291,36 +291,6 @@ TEST_CLASS(MoveTests) {
         Assert::AreEqual(toSquare.m_nRank, move.GetToCoord().m_nRank);
     }
 
-    // Regression: a pawn sitting on the last rank of a narrow (non-main) level
-    // must not push forward, because the square one rank ahead does not exist
-    // on that level.  Previously GenFrom constructed an out-of-range CSCoord
-    // (e.g. level 6 / file 0 / rank 7 on a 7-wide level), throwing
-    // std::out_of_range from CSCoord::Validate.
-    TEST_METHOD(GenFromPawnOnLastRankOfNarrowLevelDoesNotThrow) {
-        // White pawn on level g (level 6, 7 wide) at file 0 / rank 6 (top rank).
-        const char *pszEpd =
-            "1|2/2|3/3/3|4/4/4/4|5/5/5/5/5|6/6/6/6/6/6|P6/7/7/7/7/7/7|"
-            "4k3/8/8/8/8/8/8/4K3| w - -";
-        PositionGuard position(CPosition::CreateFromEPD(pszEpd));
-
-        const CSCoord pawnCoord(6, 0, 6);
-        Assert::AreEqual((int)Pawn,
-                         (int)position.get()->GetPiece(pawnCoord.BitOffset()));
-
-        // Generating all pseudo-legal moves must not throw and must not produce
-        // any move originating from the stranded pawn.
-        heap_t heap = allocate_heap();
-        position.get()->PLegalMoves(heap);
-
-        for (unsigned int i = heap->current_section->start;
-             i < heap->current_section->end; i++) {
-            Assert::AreNotEqual(pawnCoord.BitOffset(),
-                                heap->data[i].GetFromCoord().BitOffset(),
-                                L"Pawn on last rank of narrow level must not move forward");
-        }
-        free_heap(heap);
-    }
-
     // Closes the DoMove/UndoMove test gap left by the king-safety self-play
     // repro (which only ever calls DoMove). Play a long pseudo-random legal
     // game recording every move, then UndoMove each one in reverse order and
@@ -423,10 +393,7 @@ TEST_CLASS(MoveTests) {
 
     TEST_METHOD(SANRoundTripsForAllLegalMovesInReportedStrategyEPD) {
         const char *pszEpd =
-            "1|2/1r|3/3/3|4/4/4/4|4R/5/5/5/5|6/6/6/6/6/4N1|ppppppp/7/7/7/7/2NPN2/PPPQPPP|"
-            "r1bq1rk1/p1pp1ppp/1pnbp3/8/8/8/PPPPPPPP/2BQ1B1R|"
-            "1nbqb1r/ppppppp/4n2/7/7/PP1PPPP/1NBKB1R|"
-            "pppppp/6/6/6/P5/1PPPPP|5/5/5/5/5|4/4/4/4|3/3/3|2/2|1 w - -";
+            "r1bq1rk1/p1pp1ppp/1pnbp3/8/8/2NPN3/PPPQPPPP/2BR1BKR w - -";
         PositionGuard position(CPosition::CreateFromEPD(pszEpd));
         Assert::IsNotNull(position.get(), L"Failed to create position from EPD");
 

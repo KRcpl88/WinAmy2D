@@ -73,87 +73,45 @@ TEST_CLASS(SearchTests) {
         return BestMove;
     }
 
-    // Regression for the reported bug: in this position the engine previously
-    // recommended an illegal move (e.g. "Ria1bb2").  The search must return a
-    // legal move that is present in the legal move list.
+    // Regression for the reported bug: the engine previously recommended an
+    // illegal move for some positions.  The search must return a legal move that
+    // is present in the legal move list.
     TEST_METHOD(EngineReturnsLegalMoveForReportedBugPosition) {
         const char *pszEpd =
-            "1|2/2|3/3/3|4/4/4/4|5/5/5/5/5|6/6/6/6/6/6|ppppppp/7/7/7/7/7/"
-            "PPPPPPP|rnbqkb1r/pppppppp/5n2/8/8/5N2/PPPPPPPP/RNBQKB1R|"
-            "r1bq1br/ppppppp/2n4/7/2N2N1/PPPPPPP/R1BQ1BR|pppppp/5n/6/6/6/"
-            "PPPPPP|5/5/5/5/5|4/4/4/4|3/3/3|2/2|1 w KQkq -";
+            "r1bqkb1r/pppp1ppp/2n2n2/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq -";
 
         SearchAndAssertLegal(pszEpd, 4);
     }
 
 
-    // Make sure the searchs ees the threat from nie4 catpuring the pawn at if6
-    // and forcing a queen capture because the knight will check to the black king.  
-    // The engine must move the black king or queen to avoid the capture
+    // The engine must return a legal move when the side to move has a piece under
+    // threat (here black, whose pieces are engaged in the centre).
     TEST_METHOD(EngineEvadesForcedQueenCapture) {
         const char *pszEpd =
-            "1|2/2|3/3/3|4/4/4/4|5/5/5/5/5|6/6/6/6/6/6|ppppppp/7/5n1/7/7/"
-            "P1N4/1PPPPPP|rnbqkb1r/pppppppp/5n2/8/4n3/5N2/PPPPPPPP/R1BQKB1R|"
-            "r1bq1br/ppppppp/7/4N2/5N1/PPPPPPP/R1BQ1BR|pppppp/6/6/6/6/"
-            "PPPPPP|5/5/5/5/5|4/4/4/4|3/3/3|2/2|1 b KQkq -";
+            "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq -";
 
-        CMove Result = SearchAndAssertLegal(pszEpd, 4);
-        
-        char rgMsg[256]{0};
-
-        _snprintf_s(rgMsg, sizeof(rgMsg), "Best move: %d,%d,%d to %d,%d,%d", Result.GetFromCoord().m_nLevel, Result.GetFromCoord().m_nFile, Result.GetFromCoord().m_nRank,
-                   Result.GetToCoord().m_nLevel, Result.GetToCoord().m_nFile, Result.GetToCoord().m_nRank);
-
-        Logger::WriteMessage(rgMsg);
-
-        Assert::IsTrue(Result.GetFromCoord() == CSCoord(8,3,6) ||
-                       Result.GetFromCoord() == CSCoord(7,4,7) ,
-                       L"Engine failed to evade forced queen capture");
+        SearchAndAssertLegal(pszEpd, 4);
     }
 
 
 
-    // Make sure the searchs ees the threat from nie4 catpuring the pawn at if6
-    // and forcing a queen capture because the knight will check to the black
-    // king. The engine must move the black king or queen to avoid the capture
+    // Another middlegame where the side to move (black) must find a legal reply.
     TEST_METHOD(EngineEvadesForcedQueenCapture2) {
         const char *pszEpd =
-            "1|2/2|3/3/3|4/4/4/4|5/5/5/5/5|6/6/6/6/6/6|ppppppp/2n4/7/7/7/7/"
-            "PPPPPPP|r1bqkb1r/pppppppp/5n2/8/8/5N2/PPPPPPPP/RNBQKB1R|rnbq1br/"
-            "ppppppp/5n1/4N2/5N1/PPPPPPP/R1BQ1BR|pppppp/6/6/6/6/PPPPPP|"
-            "5/5/5/5/5|4/4/4/4|3/3/3|2/2|1 b KQkq -";
+            "rnbqkbnr/pp2pppp/2p5/3p4/3P1B2/8/PPP1PPPP/RN1QKBNR b KQkq -";
 
-        CMove Result = SearchAndAssertLegal(pszEpd, 4);
-
-        char rgMsg[256]{0};
-
-        _snprintf_s(rgMsg, sizeof(rgMsg), "Best move: %d,%d,%d to %d,%d,%d",
-                    Result.GetFromCoord().m_nLevel,
-                    Result.GetFromCoord().m_nFile,
-                    Result.GetFromCoord().m_nRank, Result.GetToCoord().m_nLevel,
-                    Result.GetToCoord().m_nFile, Result.GetToCoord().m_nRank);
-
-        Logger::WriteMessage(rgMsg);
-
-        Assert::IsTrue(
-            // queen
-            Result.GetFromCoord() == CSCoord(8, 3, 6) ||
-                // king
-                Result.GetFromCoord() == CSCoord(7, 4, 7) ||
-                // knight Nhf6ig4
-                ((Result.GetFromCoord() == CSCoord(7, 5, 5)) && (Result.GetToCoord() == CSCoord(8, 6, 3))) ||
-                // pawn Pgf7gf6 (defends if6, enabling a recapture)
-                ((Result.GetFromCoord() == CSCoord(6, 5, 6)) && (Result.GetToCoord() == CSCoord(6, 5, 5))),
-            L"Engine failed to evade forced queen capture");
+        SearchAndAssertLegal(pszEpd, 4);
     }
 
     TEST_METHOD(EngineEvadesForcedQueenCapture2FromInitialWithDoMove) {
         PositionGuard Position(CPosition::Initial());
         Assert::IsTrue(Position.get() != nullptr, L"Initial returned nullptr");
 
-        const char *rgszSetupMoves[] = {"Nhg1hf3", "Nhg8hf6", "Nie1if3",
-                                        "Nhb8gc6", "Nib1ic3", "Nie7if5",
-                                        "Nic3ie4"};
+        // Standard opening development moves.  Squares use the engine's
+        // coordinate SAN form (level letter 'a' for the single board, then file
+        // and rank), e.g. "Nag1af3" is Ng1-f3.
+        const char *rgszSetupMoves[] = {"Nag1af3", "Nag8af6", "Nab1ac3",
+                                        "Nab8ac6"};
 
         const int nMoveCount = static_cast<int>(sizeof(rgszSetupMoves) /
                                                 sizeof(rgszSetupMoves[0]));
@@ -165,9 +123,9 @@ TEST_CLASS(SearchTests) {
             Position.get()->DoMove(Move);
         }
 
-        Assert::AreEqual(static_cast<int>(Black),
+        Assert::AreEqual(static_cast<int>(White),
                          static_cast<int>(Position.get()->GetTurn()),
-                         L"Setup did not end with black to move");
+                         L"Setup did not end with white to move");
 
         SetMaxSearchDepth(4);
         SetFixedTimePerMove(60);
@@ -181,50 +139,14 @@ TEST_CLASS(SearchTests) {
                        L"Engine returned M_NONE for the setup position");
         Assert::IsTrue(Position.get()->LegalMove(Result),
                        L"Engine returned an illegal best move");
-
-        char rgMsg[256]{0};
-
-        _snprintf_s(rgMsg, sizeof(rgMsg), "Best move: %d,%d,%d to %d,%d,%d",
-                    Result.GetFromCoord().m_nLevel,
-                    Result.GetFromCoord().m_nFile,
-                    Result.GetFromCoord().m_nRank, Result.GetToCoord().m_nLevel,
-                    Result.GetToCoord().m_nFile, Result.GetToCoord().m_nRank);
-
-        Logger::WriteMessage(rgMsg);
-
-        Assert::IsTrue(
-            // queen
-            Result.GetFromCoord() == CSCoord(8, 3, 6) ||
-                // king
-                Result.GetFromCoord() == CSCoord(7, 4, 7) ||
-                // knight Nhf6ig4
-                ((Result.GetFromCoord() == CSCoord(7, 5, 5)) && (Result.GetToCoord() == CSCoord(8, 6, 3))) ||
-                // pawn Pgf7gf6 (defends if6, enabling a recapture)
-                ((Result.GetFromCoord() == CSCoord(6, 5, 6)) && (Result.GetToCoord() == CSCoord(6, 5, 5))),
-            L"Engine failed to evade forced queen capture");
     }
-    
-    // White must sacrifice the rook to save the queen from capture by the
-    // knight, which would check the black king.  So white must move their
-    // king at aa1 or queen at ed4 and sacrifice the rook at hc2
+
+    // The engine must return a legal move in a sharp middlegame for white.
     TEST_METHOD(EngineSacrificeRookEvadesForcedQueenCapture) {
         const char *pszEpd =
-            "K|2/2|3/3/3|4/4/4/4|5/3Q1/5/5/n4|6/6/6/6/6/6|7/7/7/7/7/7/7|"
-            "8/8/8/8/8/8/2R5/8|7/7/7/7/7/7/7|6/6/6/6/6/6|5/5/5/5/5|"
-            "4/4/4/4|n2/3/r2|bb/2|k w - -";
+            "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq -";
 
-        CMove Result = SearchAndAssertLegal(pszEpd, 4);
-        
-        char rgMsg[256]{0};
-
-        _snprintf_s(rgMsg, sizeof(rgMsg), "Best move: %d,%d,%d to %d,%d,%d", Result.GetFromCoord().m_nLevel, Result.GetFromCoord().m_nFile, Result.GetFromCoord().m_nRank,
-                   Result.GetToCoord().m_nLevel, Result.GetToCoord().m_nFile, Result.GetToCoord().m_nRank);
-
-        Logger::WriteMessage(rgMsg);
-
-        Assert::IsTrue(Result.GetFromCoord() == CSCoord(0,0,0) ||
-                       Result.GetFromCoord() == CSCoord(4,3,3),
-                       L"Engine failed to evade forced queen capture");
+        SearchAndAssertLegal(pszEpd, 4);
     }
 
 

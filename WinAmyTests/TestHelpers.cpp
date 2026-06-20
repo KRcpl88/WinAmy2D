@@ -105,10 +105,9 @@ CMove MakeMainBoardPromotion(int from, int to, int promotionType, int flags) {
 
 std::string BuildMainBoardEPD(const std::string &mainBoardPlacement, const std::string &sideToMove,
                               const std::string &castleRights, const std::string &enPassant) {
-    static const char *kLevelPrefix =
-        "1|2/2|3/3/3|4/4/4/4|5/5/5/5/5|6/6/6/6/6/6|7/7/7/7/7/7/7|";
-    return std::string(kLevelPrefix) + mainBoardPlacement + " " + sideToMove + " " + castleRights +
-           " " + enPassant;
+    // The engine now models a single standard 8x8 board (level 0), so the EPD
+    // is just the standard placement with no multi-level prefix.
+    return mainBoardPlacement + " " + sideToMove + " " + castleRights + " " + enPassant;
 }
 
 CPosition *CreatePositionFromLegacyMainEPD(const char *legacyMainBoardEpd) {

@@ -18,10 +18,7 @@ TEST_CLASS(ReproTests) {
 
     TEST_METHOD(EngineCorruptedRepro) {
         const char *epd =
-            "1|2/2|3/3/3|4/4/4/4|5/5/5/5/5|6/6/6/6/6/6|pppppp1/4n1p/7/7/7/7/"
-            "PPPPPPP|rnbqkb1r/ppp1pppp/8/4N3/3P4/1P6/4PPPP/RNBQ1B1R|r1bq1b1/"
-            "ppppppp/7/7/2P4/PPP1PnP/2BQKBR|pppppp/6/6/6/2N3/PPPPPP|5/5/5/5/5|"
-            "4/4/4/4|3/3/3|2/2|1 b q -";
+            "r1bqkb1r/pp1n1ppp/2p1pn2/3p4/2PP4/2N1PN2/PP3PPP/R1BQKB1R w - -";
 
         CPosition *p = CPosition::CreateFromEPD(epd);
         Assert::IsNotNull(p, L"EPD did not parse");
@@ -64,10 +61,7 @@ TEST_CLASS(ReproTests) {
     }
     TEST_METHOD(CountRootMovesCorruptedPosition) {
         const char *epd =
-            "1|2/2|3/3/3|4/4/4/4|5/5/5/5/5|6/6/6/6/6/6|pppppp1/4n1p/7/7/7/7/"
-            "PPPPPPP|rnbqkb1r/ppp1pppp/8/4N3/3P4/1P6/4PPPP/RNBQ1B1R|r1bq1b1/"
-            "ppppppp/7/7/2P4/PPP1PnP/2BQKBR|pppppp/6/6/6/2N3/PPPPPP|5/5/5/5/5|"
-            "4/4/4/4|3/3/3|2/2|1 b q -";
+            "r1bqkb1r/pp1n1ppp/2p1pn2/3p4/2PP4/2N1PN2/PP3PPP/R1BQKB1R w - -";
 
         CPosition *p = CPosition::CreateFromEPD(epd);
         Assert::IsNotNull(p, L"EPD did not parse");
@@ -90,10 +84,9 @@ TEST_CLASS(ReproTests) {
 
     TEST_METHOD(GameReplayMaskConsistency) {
         const char *moves[] = {
-            "Phd2hd4", "Phd7hd5", "Phc2hc4", "Phd5xhc4", "Nhg1hf3", "Nie7id5",
-            "Phb2hb3", "Phc4xhb3", "Pha2xhb3", "Nhg8ge6", "Ria1bb2", "Nib7hd6",
-            "Nib1ic3", "Nid5xic3", "Pid2xic3", "Pgg7gg6", "Nhf3he5", "Nhd6ie4",
-            "Rbb2xhh8", "Rig7xhh8", "Nie1jc2", "Nie4xif2", "Khe1ie1"};
+            "Pad2ad4", "Pad7ad5", "Nag1af3", "Nag8af6", "Pac2ac4", "Pae7ae6",
+            "Nab1ac3", "Pac7ac6", "Pae2ae3", "Nab8ad7", "Baf1ad3",
+            "Pad5xac4", "Bad3xac4", "Pab7ab5"};
         const int nMoves = sizeof(moves) / sizeof(moves[0]);
 
         PositionGuard pos(CPosition::Initial());
@@ -138,10 +131,9 @@ TEST_CLASS(ReproTests) {
 
     TEST_METHOD(GameReplayThenSearchLegal) {
         const char *moves[] = {
-            "Phd2hd4", "Phd7hd5", "Phc2hc4", "Phd5xhc4", "Nhg1hf3", "Nie7id5",
-            "Phb2hb3", "Phc4xhb3", "Pha2xhb3", "Nhg8ge6", "Ria1bb2", "Nib7hd6",
-            "Nib1ic3", "Nid5xic3", "Pid2xic3", "Pgg7gg6", "Nhf3he5", "Nhd6ie4",
-            "Rbb2xhh8", "Rig7xhh8", "Nie1jc2", "Nie4xif2", "Khe1ie1"};
+            "Pad2ad4", "Pad7ad5", "Nag1af3", "Nag8af6", "Pac2ac4", "Pae7ae6",
+            "Nab1ac3", "Pac7ac6", "Pae2ae3", "Nab8ad7", "Baf1ad3",
+            "Pad5xac4", "Bad3xac4", "Pab7ab5"};
         const int nMoves = sizeof(moves) / sizeof(moves[0]);
 
         PositionGuard pos(CPosition::Initial());
@@ -184,13 +176,11 @@ TEST_CLASS(ReproTests) {
     // must be legal in the resulting position. Engine diagnostics emitted via
     // Print/PrintDebug during the search are captured to the module log file.
     TEST_METHOD(EngineCorruptedPgnTimedSearchProducesLegalMove) {
-        // Moves transcribed from engine-corrupted.pgn4 (check annotation on
-        // Nie4xif2+ dropped, matching the SAN the parser accepts).
+        // Moves transcribed from a standard Semi-Slav game.
         const char *moves[] = {
-            "Phd2hd4", "Phd7hd5", "Phc2hc4", "Phd5xhc4", "Nhg1hf3", "Nie7id5",
-            "Phb2hb3", "Phc4xhb3", "Pha2xhb3", "Nhg8ge6", "Ria1bb2", "Nib7hd6",
-            "Nib1ic3", "Nid5xic3", "Pid2xic3", "Pgg7gg6", "Nhf3he5", "Nhd6ie4",
-            "Rbb2xhh8", "Rig7xhh8", "Nie1jc2", "Nie4xif2", "Khe1ie1"};
+            "Pad2ad4", "Pad7ad5", "Nag1af3", "Nag8af6", "Pac2ac4", "Pae7ae6",
+            "Nab1ac3", "Pac7ac6", "Pae2ae3", "Nab8ad7", "Baf1ad3",
+            "Pad5xac4", "Bad3xac4", "Pab7ab5"};
         const int nMoves = sizeof(moves) / sizeof(moves[0]);
 
         PositionGuard pos(CPosition::Initial());
@@ -315,10 +305,9 @@ TEST_CLASS(ReproTests) {
 
     TEST_METHOD(GamePositionPerftUnmakeRestores) {
         const char *moves[] = {
-            "Phd2hd4", "Phd7hd5", "Phc2hc4", "Phd5xhc4", "Nhg1hf3", "Nie7id5",
-            "Phb2hb3", "Phc4xhb3", "Pha2xhb3", "Nhg8ge6", "Ria1bb2", "Nib7hd6",
-            "Nib1ic3", "Nid5xic3", "Pid2xic3", "Pgg7gg6", "Nhf3he5", "Nhd6ie4",
-            "Rbb2xhh8", "Rig7xhh8", "Nie1jc2", "Nie4xif2", "Khe1ie1"};
+            "Pad2ad4", "Pad7ad5", "Nag1af3", "Nag8af6", "Pac2ac4", "Pae7ae6",
+            "Nab1ac3", "Pac7ac6", "Pae2ae3", "Nab8ad7", "Baf1ad3",
+            "Pad5xac4", "Bad3xac4", "Pab7ab5"};
         const int nMoves = sizeof(moves) / sizeof(moves[0]);
 
         PositionGuard pos(CPosition::Initial());
