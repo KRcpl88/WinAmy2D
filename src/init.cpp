@@ -348,14 +348,14 @@ void InitMiscMasks(void) {
                 if (rank == 5) {
                     ThirdRank[Black] |= CBitBoard::SetMask(square);
                 }
-                // PrePromoRank: one step from promotion, only on promotion levels f–j (5–9)
-                if (level >= 5 && level <= 9) {
-                    if (rank == width - 2) {
-                        PrePromoRank[White] |= CBitBoard::SetMask(square);
-                    }
-                    if (rank == 1) {
-                        PrePromoRank[Black] |= CBitBoard::SetMask(square);
-                    }
+                // PrePromoRank: one step from promotion. With a single 8x8
+                // board this is white's rank 7 (index 6) and black's rank 2
+                // (index 1).
+                if (rank == width - 2) {
+                    PrePromoRank[White] |= CBitBoard::SetMask(square);
+                }
+                if (rank == 1) {
+                    PrePromoRank[Black] |= CBitBoard::SetMask(square);
                 }
             }
         }

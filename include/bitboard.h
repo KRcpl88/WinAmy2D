@@ -42,14 +42,17 @@ typedef uint64_t BitBoardBits;
 
 class CBitBoard {
   public:
-    static constexpr uint16_t NUM_LEVELS = 15U;
+    // The engine now models a single standard 8x8 board. The board-level
+    // enumeration is retained (it still enumerates "levels"), but there is now
+    // exactly one level (index 0) which is a full 8x8 board.
+    static constexpr uint16_t NUM_LEVELS = 1U;
     static constexpr uint16_t MAX_LEVEL_WIDTH = 8U;
-    static constexpr uint16_t SIZE = 344U;
+    static constexpr uint16_t SIZE = 64U;
     static constexpr uint16_t ULONGLONG_SIZE_BITS = static_cast<uint16_t>(sizeof(std::uint64_t) * 8U);
     static constexpr uint16_t SIZE_ULONGLONG = (SIZE + ULONGLONG_SIZE_BITS - 1U) / ULONGLONG_SIZE_BITS;
-    static constexpr uint16_t LEVEL_SIZE[NUM_LEVELS] = {1, 4, 9, 16, 25, 36, 49, 64, 49, 36, 25, 16, 9, 4, 1};
-    static constexpr uint16_t LEVEL_WIDTH[NUM_LEVELS] = {1, 2, 3, 4, 5, 6, 7, 8, 7, 6, 5, 4, 3, 2, 1};
-    static constexpr uint16_t LEVEL_OFFSET[NUM_LEVELS] = {0U, 1, 5, 14, 30, 55, 91, 140, 204, 253, 289, 314, 330, 339, 343};
+    static constexpr uint16_t LEVEL_SIZE[NUM_LEVELS] = {64};
+    static constexpr uint16_t LEVEL_WIDTH[NUM_LEVELS] = {8};
+    static constexpr uint16_t LEVEL_OFFSET[NUM_LEVELS] = {0U};
 
     CBitBoard() : m_rgBits{} {}
     explicit CBitBoard(BitBoardBits bits) : m_rgBits{bits} {}

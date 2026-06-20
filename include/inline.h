@@ -131,11 +131,9 @@ static inline CMove make_promotion(int from, int to, int type, int flags) {
 
 /**
  * Returns if the square is a promotion square.
- * Promotion only occurs on levels f–j (indices 5–9).
+ * With a single standard 8x8 board, promotion occurs on the first or last rank.
  */
 static inline bool is_promo_square(CSCoord sq) {
-    if (sq.m_nLevel < 5 || sq.m_nLevel > 9)
-        return false;
     const uint16_t width = static_cast<uint16_t>(CBitBoard::LEVEL_WIDTH[sq.m_nLevel]);
     return sq.m_nRank == 0 || sq.m_nRank == (width - 1);
 }
@@ -143,12 +141,11 @@ static inline bool is_promo_square(CSCoord sq) {
 /**
  * Returns whether a pawn may legally occupy the given square.
  *
- * A pawn can only land on the first or last rank of a level by promoting, and
- * promotion is permitted only on the central levels f–j (see is_promo_square).
- * On every other level the edge ranks are unreachable for a pawn, so a move that
- * would place a pawn there is illegal.  CPosition::LegalMove already rejects such
- * moves; move generators use this helper to avoid emitting them, keeping move
- * generation consistent with move legality.
+ * A pawn can only land on the first or last rank of the board by promoting.
+ * On a single standard 8x8 board every edge-rank landing is a promotion, so a
+ * non-promoting move onto an edge rank is illegal.  CPosition::LegalMove already
+ * rejects such moves; move generators use this helper to avoid emitting them,
+ * keeping move generation consistent with move legality.
  */
 static inline bool pawn_may_move_to(CSCoord sq) {
     const uint16_t width = static_cast<uint16_t>(CBitBoard::LEVEL_WIDTH[sq.m_nLevel]);

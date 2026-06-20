@@ -94,61 +94,57 @@ static inline CSCoord InvalidSquareCoord(void) {
 }
 
 /*
- * Named constants for squares on the main 8x8 board (level 'h', level 7).
- * Values equal 140 (= CBitBoard::LEVEL_OFFSET[7]) + rank*8 + file, so they
- * map directly to 3D BitBoard offsets.  ha1 is white's bottom-left corner
- * (offset 140), hh8 is black's top-right corner (offset 203).
- *
- * aa1 and oa1 are the single squares of the bottom-most (level 'a', level 0)
- * and top-most (level 'o', level 14) boards respectively.
+ * Named constants for squares on the single standard 8x8 board (level 0).
+ * Values equal 0 (= CBitBoard::LEVEL_OFFSET[0]) + rank*8 + file, so they map
+ * directly to BitBoard offsets.  ha1 is white's bottom-left corner (offset 0),
+ * hh8 is black's top-right corner (offset 63).  The 'h' prefix is retained for
+ * source/test compatibility with the former multi-level naming scheme.
  */
 // clang-format off
 typedef enum {
-    ha1 = 140, hb1, hc1, hd1, he1, hf1, hg1, hh1,
+    ha1 = 0, hb1, hc1, hd1, he1, hf1, hg1, hh1,
     ha2, hb2, hc2, hd2, he2, hf2, hg2, hh2,
     ha3, hb3, hc3, hd3, he3, hf3, hg3, hh3,
     ha4, hb4, hc4, hd4, he4, hf4, hg4, hh4,
     ha5, hb5, hc5, hd5, he5, hf5, hg5, hh5,
     ha6, hb6, hc6, hd6, he6, hf6, hg6, hh6,
     ha7, hb7, hc7, hd7, he7, hf7, hg7, hh7,
-    ha8, hb8, hc8, hd8, he8, hf8, hg8, hh8,
-    aa1 = 0,   // level 'a' (bottom 1x1 board) -- only square
-    oa1 = 343  // level 'o' (top 1x1 board)    -- only square
+    ha8, hb8, hc8, hd8, he8, hf8, hg8, hh8
 } Square;
 // clang-format on
 
 /*
- * Castling is only valid on the main 8x8 board (level 7).
+ * Castling is only valid on the single board level (level 0, the only level).
  * These constants provide proper CSCoord-compatible offsets for castling squares.
  */
-static constexpr uint16_t MAIN_LEVEL = 7;
-static constexpr uint16_t MAIN_LEVEL_OFFSET = 140; // CBitBoard::LEVEL_OFFSET[7]
+static constexpr uint16_t MAIN_LEVEL = 0;
+static constexpr uint16_t MAIN_LEVEL_OFFSET = 0; // CBitBoard::LEVEL_OFFSET[0]
 
-// King home squares on level 7
-static constexpr int CASTLE_E1 = MAIN_LEVEL_OFFSET + 0 * 8 + 4; // 144
-static constexpr int CASTLE_E8 = MAIN_LEVEL_OFFSET + 7 * 8 + 4; // 200
+// King home squares on the board level
+static constexpr int CASTLE_E1 = MAIN_LEVEL_OFFSET + 0 * 8 + 4; // 4
+static constexpr int CASTLE_E8 = MAIN_LEVEL_OFFSET + 7 * 8 + 4; // 60
 
 // Short castle target squares
-static constexpr int CASTLE_G1 = MAIN_LEVEL_OFFSET + 0 * 8 + 6; // 146
-static constexpr int CASTLE_G8 = MAIN_LEVEL_OFFSET + 7 * 8 + 6; // 202
+static constexpr int CASTLE_G1 = MAIN_LEVEL_OFFSET + 0 * 8 + 6; // 6
+static constexpr int CASTLE_G8 = MAIN_LEVEL_OFFSET + 7 * 8 + 6; // 62
 
 // Long castle target squares
-static constexpr int CASTLE_C1 = MAIN_LEVEL_OFFSET + 0 * 8 + 2; // 142
-static constexpr int CASTLE_C8 = MAIN_LEVEL_OFFSET + 7 * 8 + 2; // 198
+static constexpr int CASTLE_C1 = MAIN_LEVEL_OFFSET + 0 * 8 + 2; // 2
+static constexpr int CASTLE_C8 = MAIN_LEVEL_OFFSET + 7 * 8 + 2; // 58
 
 // Squares checked during castling legality (must be empty/not attacked)
-static constexpr int CASTLE_F1 = MAIN_LEVEL_OFFSET + 0 * 8 + 5; // 145
-static constexpr int CASTLE_F8 = MAIN_LEVEL_OFFSET + 7 * 8 + 5; // 201
-static constexpr int CASTLE_D1 = MAIN_LEVEL_OFFSET + 0 * 8 + 3; // 143
-static constexpr int CASTLE_D8 = MAIN_LEVEL_OFFSET + 7 * 8 + 3; // 199
-static constexpr int CASTLE_B1 = MAIN_LEVEL_OFFSET + 0 * 8 + 1; // 141
-static constexpr int CASTLE_B8 = MAIN_LEVEL_OFFSET + 7 * 8 + 1; // 197
+static constexpr int CASTLE_F1 = MAIN_LEVEL_OFFSET + 0 * 8 + 5; // 5
+static constexpr int CASTLE_F8 = MAIN_LEVEL_OFFSET + 7 * 8 + 5; // 61
+static constexpr int CASTLE_D1 = MAIN_LEVEL_OFFSET + 0 * 8 + 3; // 3
+static constexpr int CASTLE_D8 = MAIN_LEVEL_OFFSET + 7 * 8 + 3; // 59
+static constexpr int CASTLE_B1 = MAIN_LEVEL_OFFSET + 0 * 8 + 1; // 1
+static constexpr int CASTLE_B8 = MAIN_LEVEL_OFFSET + 7 * 8 + 1; // 57
 
 // Rook home squares for castling
-static constexpr int CASTLE_H1 = MAIN_LEVEL_OFFSET + 0 * 8 + 7; // 147
-static constexpr int CASTLE_H8 = MAIN_LEVEL_OFFSET + 7 * 8 + 7; // 203
-static constexpr int CASTLE_A1 = MAIN_LEVEL_OFFSET + 0 * 8 + 0; // 140
-static constexpr int CASTLE_A8 = MAIN_LEVEL_OFFSET + 7 * 8 + 0; // 196
+static constexpr int CASTLE_H1 = MAIN_LEVEL_OFFSET + 0 * 8 + 7; // 7
+static constexpr int CASTLE_H8 = MAIN_LEVEL_OFFSET + 7 * 8 + 7; // 63
+static constexpr int CASTLE_A1 = MAIN_LEVEL_OFFSET + 0 * 8 + 0; // 0
+static constexpr int CASTLE_A8 = MAIN_LEVEL_OFFSET + 7 * 8 + 0; // 56
 
 struct SGameLog {
     CMove gl_Move;        /* the move that has been made in the position */
