@@ -101,7 +101,6 @@ private:
     void SetViewMode(ViewMode mode);
     void UpdateViewToggleButton();
     void UpdateOutlinesMenuItem();
-    void UpdateAxisControls();
     void SetGridType(CUCoord::EOutlineType eType);
     void SetGridTypeFromMenu(int nMenuId);
     void UpdateGridMenuEnabled();
@@ -120,10 +119,8 @@ private:
     HWND m_hBtnZoomIn    = nullptr;
     HWND m_hBtnZoomOut    = nullptr;
     HWND m_hBtnRotateGrid = nullptr;
-    HWND m_hCbSwapAxes   = nullptr;
 
-    // Shared toolbar x-origin for the grid-type (3D) and swap-axes (2D)
-    // dropdowns so they occupy the same slot when the view mode changes.
+    // Shared toolbar x-origin for the grid-type (3D) dropdown.
     int  m_nDropdownX    = 0;
 
     // ---- Owned subsystems (group B) ------------------------------------

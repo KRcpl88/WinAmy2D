@@ -78,7 +78,6 @@
 #define IDC_BTN_ZOOM_OUT    2011
 #define IDC_BTN_VIEW_TOGGLE 2012
 #define IDC_CB_GRID_TYPE    2013
-#define IDC_CB_SWAP_AXES    2017
 #define IDC_BTN_ROTATE_GRID 2018
 
 // Custom window messages

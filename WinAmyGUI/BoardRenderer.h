@@ -12,12 +12,6 @@
 
 class BoardRenderer {
 public:
-    // Retained for source compatibility with the window shell, which still
-    // exposes a view-plane selector left over from the 4D board. The flat 2D
-    // view now always renders the single standard 8x8 board, so the selected
-    // plane has no effect on what is drawn.
-    enum class ViewPlane { PlaneXY, PlaneXZ, PlaneYZ };
-
     // Square size in pixels.
     static constexpr int SQUARE_SIZE = 36;
 
@@ -64,11 +58,6 @@ public:
     // coord if no square is there.
     CSCoord HitTest(POINT pt) const;
 
-    // Retained no-op view-plane accessors (see ViewPlane above). The flat 2D
-    // view always renders the standard 8x8 board regardless of the value.
-    void SetViewPlane(ViewPlane eViewPlane) { m_eViewPlane = eViewPlane; }
-    ViewPlane GetViewPlane() const { return m_eViewPlane; }
-
     // Return the total width and height required for the board area.
     static SIZE GetBoardAreaSize();
 
@@ -84,7 +73,4 @@ private:
 
     // Return the Unicode chess piece glyph for the given piece value.
     static wchar_t PieceGlyph(int8_t piece);
-
-    // Retained selected view plane. Has no effect on the flat 8x8 view.
-    ViewPlane m_eViewPlane{ViewPlane::PlaneXY};
 };
