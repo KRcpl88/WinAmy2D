@@ -1972,10 +1972,10 @@ void InitEvaluation(const CPosition *p) {
         }
     }
 
-    WPawnPos[CSCoord(7, 3, 1).BitOffset()] += CrampingPawn;  /* d2 */
-    WPawnPos[CSCoord(7, 4, 1).BitOffset()] += CrampingPawn;  /* e2 */
-    BPawnPos[CSCoord(7, 3, 6).BitOffset()] += CrampingPawn;  /* d7 */
-    BPawnPos[CSCoord(7, 4, 6).BitOffset()] += CrampingPawn;  /* e7 */
+    WPawnPos[CSCoord(0, 3, 1).BitOffset()] += CrampingPawn;  /* d2 */
+    WPawnPos[CSCoord(0, 4, 1).BitOffset()] += CrampingPawn;  /* e2 */
+    BPawnPos[CSCoord(0, 3, 6).BitOffset()] += CrampingPawn;  /* d7 */
+    BPawnPos[CSCoord(0, 4, 6).BitOffset()] += CrampingPawn;  /* e7 */
 
     ClearPawnHashTable();
 

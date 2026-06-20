@@ -18,10 +18,10 @@ struct SPlacement {
     char chPiece;
 };
 
-// Build a full 15-level 3D EPD from an explicit list of piece placements. This
-// lets a test position any piece on any level/file/rank — which the flat
-// main-board helper (CreatePositionFromLegacyMainEPD) cannot do — so cross-level
-// pawn captures can be set up deterministically.
+// Build a single-level 8x8 EPD from an explicit list of piece placements. This
+// lets a test position any piece on any file/rank (level is always 0 now) —
+// which the flat main-board helper (CreatePositionFromLegacyMainEPD) cannot do —
+// so pawn-promotion captures can be set up deterministically.
 static std::string BuildBoardEPD(const std::vector<SPlacement> &Placements,
                                  char chSideToMove) {
     char rgchPiece[CBitBoard::SIZE];
@@ -305,26 +305,22 @@ TEST_CLASS(SearchDataTests) {
         }
     }
 
-    // Targeted edge-case coverage for the 3D quiescence capture generator
+    // Targeted edge-case coverage for the quiescence capture generator
     // (EmitQCapture).  Each position is built explicitly with BuildBoardEPD so
-    // the geometry is readable: a pawn captures ACROSS LEVELS onto a promotion
-    // square.  Regardless of the pawn's source rank/level, such a capture must
-    // promote, and the quiescence generator must emit the promoting capture
-    // exactly like the authoritative LegalMoves generator.  Applying the move
-    // must leave the promoted piece on the destination square.
-    TEST_METHOD(QuiescenceGeneratesCrossLevelPromotionCaptures) {
-        // White pawn on the main level (7) at file 2 / rank 1 captures across
-        // levels onto promotion square level f (5) / file 1 / rank 0, which is
-        // occupied by a black queen.  The pawn's source is NOT on a
-        // pre-promotion rank, yet the capture must still promote.
+    // the geometry is readable: a pawn captures onto a promotion square.  Such a
+    // capture must promote, and the quiescence generator must emit the promoting
+    // capture exactly like the authoritative LegalMoves generator.  Applying the
+    // move must leave the promoted piece on the destination square.
+    TEST_METHOD(QuiescenceGeneratesPromotionCaptures) {
+        // White pawn on b7 captures onto the a8 promotion square, occupied by a
+        // black knight.
         const std::string EpdWhite = BuildBoardEPD(
-            {{7, 2, 1, 'P'}, {5, 1, 0, 'q'}, {7, 4, 0, 'K'}, {7, 4, 7, 'k'}},
+            {{0, 1, 6, 'P'}, {0, 0, 7, 'n'}, {0, 4, 0, 'K'}, {0, 4, 4, 'k'}},
             'w');
-        // Black pawn on the main level (7) at file 1 / rank 6 captures across
-        // levels onto promotion square level f (5) / file 0 / rank 5, occupied
-        // by a white queen.
+        // Black pawn on b2 captures onto the a1 promotion square, occupied by a
+        // white knight.
         const std::string EpdBlack = BuildBoardEPD(
-            {{7, 1, 6, 'p'}, {5, 0, 5, 'Q'}, {7, 4, 0, 'K'}, {7, 4, 7, 'k'}},
+            {{0, 1, 1, 'p'}, {0, 0, 0, 'N'}, {0, 4, 7, 'k'}, {0, 4, 3, 'K'}},
             'b');
 
         for (const std::string &Epd : {EpdWhite, EpdBlack}) {
@@ -334,17 +330,16 @@ TEST_CLASS(SearchDataTests) {
             const std::vector<CMove> LegalMoves = CollectLegalMoves(Pos.get());
             const std::vector<CMove> QMoves = CollectQuiescenceMoves(Pos.get());
 
-            int nCrossLevelPromoCaptures = 0;
+            int nPromoCaptures = 0;
             for (CMove Move : LegalMoves) {
                 const uint16_t wFrom = Move.GetFromCoord().BitOffset();
                 const uint16_t wTo = Move.GetToCoord().BitOffset();
                 if (TYPE(Pos.get()->GetPiece(wFrom)) != Pawn ||
-                    Move.GetFromCoord().m_nLevel == Move.GetToCoord().m_nLevel ||
                     !is_promo_square(Move.GetToCoord()) || !Move.IsCapture() ||
                     !Move.HasPromotion()) {
                     continue;
                 }
-                nCrossLevelPromoCaptures++;
+                nPromoCaptures++;
 
                 // The destination is a promotion square, so the move must
                 // satisfy the promotion invariant.
@@ -353,8 +348,8 @@ TEST_CLASS(SearchDataTests) {
                 // The quiescence generator must emit the same promoting
                 // capture (decided by the destination, not the source rank).
                 std::wstringstream Message;
-                Message << L"quiescence generator must emit cross-level "
-                           L"promotion capture from "
+                Message << L"quiescence generator must emit promotion capture "
+                           L"from "
                         << wFrom << L" to " << wTo;
                 Assert::IsTrue(ContainsPromotingCapture(QMoves, wFrom, wTo),
                                Message.str().c_str());
@@ -367,73 +362,13 @@ TEST_CLASS(SearchDataTests) {
                 Child.get()->DoMove(Move);
                 Assert::AreEqual((int)Move.GetPromotionType(),
                                  (int)TYPE(Child.get()->GetPiece(wTo)),
-                                 L"cross-level promotion capture must leave the "
-                                 L"promoted piece on the destination");
+                                 L"promotion capture must leave the promoted "
+                                 L"piece on the destination");
             }
 
-            Assert::IsTrue(nCrossLevelPromoCaptures > 0,
-                           L"position must expose a cross-level promotion "
-                           L"capture");
+            Assert::IsTrue(nPromoCaptures > 0,
+                           L"position must expose a promotion capture");
         }
-    }
-
-    // Inverse edge case: a pawn sitting on the pre-promotion rank that captures
-    // ACROSS LEVELS onto a NON-promotion square must NOT promote.  The old
-    // generator keyed promotion off the source rank (PrePromoRank), so it would
-    // wrongly promote here; the destination-driven generator must emit a plain
-    // capture, matching the authoritative LegalMoves generator.
-    TEST_METHOD(QuiescencePrePromotionPawnCrossLevelNonPromoCaptureDoesNotPromote) {
-        // White pawn on level j (9) at file 0 / rank 4 — the pre-promotion rank
-        // of that 6-wide level — captures across levels onto the main level (7)
-        // at file 1 / rank 5, which is a NON-promotion square occupied by a
-        // black queen.
-        const std::string Epd = BuildBoardEPD(
-            {{9, 0, 4, 'P'}, {7, 1, 5, 'q'}, {7, 4, 0, 'K'}, {7, 4, 7, 'k'}},
-            'w');
-
-        PositionGuard Pos(CPosition::CreateFromEPD(Epd.c_str()));
-        Assert::IsTrue(Pos.get() != nullptr, L"EPD must parse");
-
-        // The source pawn must really sit on the pre-promotion rank, otherwise
-        // the test would not exercise the source-rank assumption it guards.
-        const CSCoord PawnCoord(9, 0, 4);
-        Assert::IsTrue(
-            PrePromoRank[Pos.get()->GetTurn()].TstBit(PawnCoord.BitOffset()),
-            L"source pawn must sit on the pre-promotion rank");
-
-        const std::vector<CMove> LegalMoves = CollectLegalMoves(Pos.get());
-        const std::vector<CMove> QMoves = CollectQuiescenceMoves(Pos.get());
-
-        int nCrossLevelNonPromoCaptures = 0;
-        for (CMove Move : LegalMoves) {
-            const uint16_t wFrom = Move.GetFromCoord().BitOffset();
-            const uint16_t wTo = Move.GetToCoord().BitOffset();
-            if (TYPE(Pos.get()->GetPiece(wFrom)) != Pawn ||
-                Move.GetFromCoord().m_nLevel == Move.GetToCoord().m_nLevel ||
-                is_promo_square(Move.GetToCoord()) || !Move.IsCapture() ||
-                !PrePromoRank[Pos.get()->GetTurn()].TstBit(wFrom)) {
-                continue;
-            }
-            nCrossLevelNonPromoCaptures++;
-
-            // A non-promotion destination must NOT carry a promotion.
-            Assert::IsFalse(Move.HasPromotion());
-            Assert::IsTrue(PawnPromotionInvariantHolds(Pos.get(), Move));
-
-            // The quiescence generator must emit the same plain capture.
-            std::wstringstream Message;
-            Message << L"quiescence generator must emit plain cross-level "
-                       L"capture from "
-                    << wFrom << L" to " << wTo;
-            Assert::IsTrue(ContainsPlainCapture(QMoves, wFrom, wTo),
-                           Message.str().c_str());
-            Assert::IsTrue(Pos.get()->LegalMove(Move));
-        }
-
-        Assert::IsTrue(
-            nCrossLevelNonPromoCaptures > 0,
-            L"position must expose a pre-promotion-rank cross-level "
-            L"non-promotion capture");
     }
 
     // Every move the quiescence generator emits must be legal and respect the
@@ -442,10 +377,10 @@ TEST_CLASS(SearchDataTests) {
     // capture or a promotion.
     TEST_METHOD(QuiescenceMovesAreLegalCapturesRespectingInvariant) {
         const std::string EpdPromo = BuildBoardEPD(
-            {{7, 2, 1, 'P'}, {5, 1, 0, 'q'}, {7, 4, 0, 'K'}, {7, 4, 7, 'k'}},
+            {{0, 1, 6, 'P'}, {0, 0, 7, 'n'}, {0, 4, 0, 'K'}, {0, 4, 4, 'k'}},
             'w');
         const std::string EpdNonPromo = BuildBoardEPD(
-            {{9, 0, 4, 'P'}, {7, 1, 5, 'q'}, {7, 4, 0, 'K'}, {7, 4, 7, 'k'}},
+            {{0, 4, 3, 'P'}, {0, 3, 4, 'p'}, {0, 4, 0, 'K'}, {0, 4, 7, 'k'}},
             'w');
 
         for (const std::string &Epd : {EpdPromo, EpdNonPromo}) {
@@ -466,19 +401,18 @@ TEST_CLASS(SearchDataTests) {
         }
     }
 
-    // Edge case: a white pawn that is NOT on a pre-promotion rank captures
-    // across levels onto a promotion square.  The pawn sits on the h-level (7)
-    // file 1 rank 1 and captures the black knight on the j-level (9) promotion
-    // square file 0 rank 0.  Promotion must be decided from the destination, so
-    // the capture must promote even though the source rank is the white home
-    // rank.  Verified through the FULL legal move generator: it must emit one
-    // legal promotion capture for EACH piece the pawn may become, and DoMove
-    // must replace the pawn with the promoted piece on the target square.
-    TEST_METHOD(LegalMoveGeneratorPromotesCrossLevelCaptureToEachPiece) {
-        const uint16_t wFrom = CSCoord(7, 1, 1).BitOffset();
-        const uint16_t wTo = CSCoord(9, 0, 0).BitOffset();
+    // Edge case: a white pawn that captures onto a promotion square.  The pawn
+    // sits on b7
+    // and captures the black knight on the a8 promotion square.  Promotion must
+    // be decided from the destination, so the capture must promote.  Verified
+    // through the FULL legal move generator: it must emit one legal promotion
+    // capture for EACH piece the pawn may become, and DoMove must replace the
+    // pawn with the promoted piece on the target square.
+    TEST_METHOD(LegalMoveGeneratorPromotesCaptureToEachPiece) {
+        const uint16_t wFrom = CSCoord(0, 1, 6).BitOffset();
+        const uint16_t wTo = CSCoord(0, 0, 7).BitOffset();
         const std::string Epd = BuildBoardEPD(
-            {{7, 4, 0, 'K'}, {7, 4, 7, 'k'}, {7, 1, 1, 'P'}, {9, 0, 0, 'n'}}, 'w');
+            {{0, 4, 0, 'K'}, {0, 4, 7, 'k'}, {0, 1, 6, 'P'}, {0, 0, 7, 'n'}}, 'w');
         PositionGuard Pos(CPosition::CreateFromEPD(Epd.c_str()));
         Assert::IsTrue(Pos.get() != nullptr);
         Assert::IsFalse(Pos.get()->InCheck(White));
@@ -519,14 +453,14 @@ TEST_CLASS(SearchDataTests) {
         Assert::IsTrue(rgfSeenPromoType[Knight]);
     }
 
-    // The quiescence generator must also promote a cross-level capture that
-    // lands on a promotion square (it emits the queen promotion as the dominant
-    // capture).  Same position as the legal-move test above.
-    TEST_METHOD(QuiescenceGeneratorPromotesCrossLevelCapture) {
-        const uint16_t wFrom = CSCoord(7, 1, 1).BitOffset();
-        const uint16_t wTo = CSCoord(9, 0, 0).BitOffset();
+    // The quiescence generator must also promote a capture that lands on a
+    // promotion square (it emits the queen promotion as the dominant capture).
+    // Same position as the legal-move test above.
+    TEST_METHOD(QuiescenceGeneratorPromotesCapture) {
+        const uint16_t wFrom = CSCoord(0, 1, 6).BitOffset();
+        const uint16_t wTo = CSCoord(0, 0, 7).BitOffset();
         const std::string Epd = BuildBoardEPD(
-            {{7, 4, 0, 'K'}, {7, 4, 7, 'k'}, {7, 1, 1, 'P'}, {9, 0, 0, 'n'}}, 'w');
+            {{0, 4, 0, 'K'}, {0, 4, 7, 'k'}, {0, 1, 6, 'P'}, {0, 0, 7, 'n'}}, 'w');
         PositionGuard Pos(CPosition::CreateFromEPD(Epd.c_str()));
         Assert::IsTrue(Pos.get() != nullptr);
         Assert::IsFalse(Pos.get()->InCheck(White));
@@ -549,32 +483,30 @@ TEST_CLASS(SearchDataTests) {
         Assert::IsTrue(fSeenPromotionCapture);
     }
 
-    // Converse edge case (the other half of the original bug): a white pawn ON
-    // a pre-promotion rank captures across levels onto a NON-promotion square,
-    // which must NOT promote, while its other captures/pushes that land on
-    // promotion squares MUST promote.  The pawn on the g-level (6) file 0 rank 5
-    // (a pre-promotion rank) has three relevant moves:
-    //   * capture onto the g-level (6) file 1 rank 6 promotion square  -> promote
-    //   * capture across to the i-level (8) file 0 rank 5 (non-promo)   -> NO promote
-    //   * non-capturing push onto the g-level (6) file 0 rank 6 promo   -> promote
+    // Promotion is decided by the destination square, not the source rank.  A
+    // pawn on b7 (the pre-promotion rank) promotes on both its capture onto the
+    // a8 promotion square and its push onto b8, while a different pawn on e4
+    // (a middle rank) captures onto d5 WITHOUT promoting.
     TEST_METHOD(LegalMoveGeneratorPromotionIsDestinationDriven) {
-        const uint16_t wFrom = CSCoord(6, 0, 5).BitOffset();
-        const uint16_t wPromoCapture = CSCoord(6, 1, 6).BitOffset();
-        const uint16_t wNonPromoCapture = CSCoord(8, 0, 5).BitOffset();
-        const uint16_t wPromoPush = CSCoord(6, 0, 6).BitOffset();
-        const std::string Epd = BuildBoardEPD({{7, 4, 0, 'K'},
-                                               {7, 4, 7, 'k'},
-                                               {6, 0, 5, 'P'},
-                                               {6, 1, 6, 'n'},
-                                               {8, 0, 5, 'n'}},
+        const uint16_t wPromoFrom = CSCoord(0, 1, 6).BitOffset();
+        const uint16_t wPromoCapture = CSCoord(0, 0, 7).BitOffset();
+        const uint16_t wPromoPush = CSCoord(0, 1, 7).BitOffset();
+        const uint16_t wMidFrom = CSCoord(0, 4, 3).BitOffset();
+        const uint16_t wNonPromoCapture = CSCoord(0, 3, 4).BitOffset();
+        const std::string Epd = BuildBoardEPD({{0, 6, 0, 'K'},
+                                               {0, 6, 7, 'k'},
+                                               {0, 1, 6, 'P'},
+                                               {0, 0, 7, 'n'},
+                                               {0, 4, 3, 'P'},
+                                               {0, 3, 4, 'p'}},
                                               'w');
         PositionGuard Pos(CPosition::CreateFromEPD(Epd.c_str()));
         Assert::IsTrue(Pos.get() != nullptr);
         Assert::IsFalse(Pos.get()->InCheck(White));
         Assert::IsFalse(Pos.get()->InCheck(Black));
         Assert::IsTrue(is_promo_square(CSCoord(wPromoCapture)));
-        Assert::IsFalse(is_promo_square(CSCoord(wNonPromoCapture)));
         Assert::IsTrue(is_promo_square(CSCoord(wPromoPush)));
+        Assert::IsFalse(is_promo_square(CSCoord(wNonPromoCapture)));
 
         std::vector<CMove> Moves = CollectLegalMoves(Pos.get());
 
@@ -582,31 +514,29 @@ TEST_CLASS(SearchDataTests) {
         int nNonPromoCaptures = 0;
         int nPromoPushes = 0;
         for (CMove Move : Moves) {
-            if (Move.GetFromCoord().BitOffset() != wFrom) {
-                continue;
-            }
             Assert::IsTrue(PawnPromotionInvariantHolds(Pos.get(), Move));
+            const uint16_t wFrom = Move.GetFromCoord().BitOffset();
             const uint16_t wDest = Move.GetToCoord().BitOffset();
-            if (wDest == wPromoCapture) {
+            if (wFrom == wPromoFrom && wDest == wPromoCapture) {
                 Assert::IsTrue(Move.IsCapture());
                 Assert::IsTrue(Move.HasPromotion());
                 nPromoCaptures++;
-            } else if (wDest == wNonPromoCapture) {
-                Assert::IsTrue(Move.IsCapture());
-                Assert::IsFalse(Move.HasPromotion());
-                nNonPromoCaptures++;
-            } else if (wDest == wPromoPush) {
+            } else if (wFrom == wPromoFrom && wDest == wPromoPush) {
                 Assert::IsFalse(Move.IsCapture());
                 Assert::IsTrue(Move.HasPromotion());
                 nPromoPushes++;
+            } else if (wFrom == wMidFrom && wDest == wNonPromoCapture) {
+                Assert::IsTrue(Move.IsCapture());
+                Assert::IsFalse(Move.HasPromotion());
+                nNonPromoCaptures++;
             }
         }
 
-        // One legal move per promotion piece on the two promotion squares, and
+        // One legal move per promotion piece on the promotion squares, and
         // exactly one plain (non-promoting) capture on the non-promotion square.
         Assert::AreEqual(4, nPromoCaptures);
-        Assert::AreEqual(1, nNonPromoCaptures);
         Assert::AreEqual(4, nPromoPushes);
+        Assert::AreEqual(1, nNonPromoCaptures);
     }
 
     TEST_METHOD(PutKillerTracksAndPromotesByHitCount) {

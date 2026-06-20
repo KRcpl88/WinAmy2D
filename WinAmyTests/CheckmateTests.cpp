@@ -10,13 +10,14 @@ TEST_CLASS(CheckmateTests) {
         HashInit();
     }
 
-    // Regression test: after 1.id3 Nhc6 2.hd4 he6 3.hc4 Bhb4, white is in
-    // check but NOT in checkmate. White can block with Nb1-c3 (and other
-    // moves), so LegalMoves must return > 0.
+    // Regression test: after 1.e4 e6 2.d4 Bb4+, white is in check but NOT in
+    // checkmate. White can block with Nb1-c3 (and other moves), so LegalMoves
+    // must return > 0.  Squares use the engine's coordinate SAN form (level
+    // letter 'a' for the single board, then file and rank).
     TEST_METHOD(AfterBishopCheckWhiteHasLegalBlockingMoves) {
         PositionGuard position(CPosition::Initial());
 
-        const char *moves[] = {"id3", "Nhc6", "hd4", "he6", "hc4", "Bhb4"};
+        const char *moves[] = {"Pae2ae4", "Pae7ae6", "Pad2ad4", "Baf8ab4"};
         for (const char *san : moves) {
             CMove move = position.get()->ParseSAN(san);
             Assert::IsTrue(move != M_NONE,
@@ -24,9 +25,9 @@ TEST_CLASS(CheckmateTests) {
             position.get()->DoMove(move);
         }
 
-        // After 3...Bhb4, it is White's turn. The position should be check.
+        // After 2...Bb4+, it is White's turn. The position should be check.
         Assert::IsTrue(position.get()->InCheck(White),
-                       L"Expected white king to be in check after Bhb4");
+                       L"Expected white king to be in check after Bb4+");
 
         // White must have at least one legal move (e.g. Nb1-c3 blocking).
         int legalCount = position.get()->LegalMoves(NULL);
@@ -38,7 +39,7 @@ TEST_CLASS(CheckmateTests) {
     TEST_METHOD(Nb1c3IsLegalBlockingMoveAfterBishopCheck) {
         PositionGuard position(CPosition::Initial());
 
-        const char *moves[] = {"id3", "Nhc6", "hd4", "he6", "hc4", "Bhb4"};
+        const char *moves[] = {"Pae2ae4", "Pae7ae6", "Pad2ad4", "Baf8ab4"};
         for (const char *san : moves) {
             CMove move = position.get()->ParseSAN(san);
             Assert::IsTrue(move != M_NONE,
@@ -46,7 +47,7 @@ TEST_CLASS(CheckmateTests) {
             position.get()->DoMove(move);
         }
 
-        CMove block = position.get()->ParseSAN("Nhc3");
+        CMove block = position.get()->ParseSAN("Nac3");
         Assert::IsTrue(block != M_NONE, L"ParseSAN could not find Nb1-c3");
         Assert::IsTrue(position.get()->LegalMove(block),
                        L"Nb1-c3 should be a legal blocking move");

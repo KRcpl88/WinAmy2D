@@ -30,19 +30,13 @@ TEST_CLASS(SanAndCheckTests) {
         return rgMoves;
     }
 
-    // SAN must round-trip through ParseSAN for every legal move.  In 4D two
-    // same-type pieces (or pawns) can share file and rank but sit on different
-    // levels; the SAN disambiguator must encode the source level so the move
-    // parses back unambiguously.  The test also asserts that such level-only
-    // ambiguous configurations are actually encountered, so it genuinely
-    // exercises the regression.
+    // SAN must round-trip through ParseSAN for every legal move.
     TEST_METHOD(SanRoundTripsForEveryLegalMove) {
         uint32_t dwRng = 0x1234567u;
         auto Next = [&dwRng]() {
             dwRng = dwRng * 1664525u + 1013904223u;
             return dwRng;
         };
-        int nLevelDisambiguations = 0;
         for (int nGame = 0; nGame < 25; nGame++) {
             CPosition *pPosition = CPosition::Initial();
             for (int nPly = 0; nPly < 35; nPly++) {
@@ -61,33 +55,10 @@ TEST_CLASS(SanAndCheckTests) {
                         parsed.GetFromToIndex() == move.GetFromToIndex(),
                         L"SAN did not round-trip to the same move");
                 }
-                for (size_t i = 0; i < rgMoves.size(); i++) {
-                    for (size_t j = i + 1; j < rgMoves.size(); j++) {
-                        const CSCoord& fromI = rgMoves[i].GetFromCoord();
-                        const CSCoord& fromJ = rgMoves[j].GetFromCoord();
-                        const CSCoord& toI = rgMoves[i].GetToCoord();
-                        const CSCoord& toJ = rgMoves[j].GetToCoord();
-                        if (toI.BitOffset() != toJ.BitOffset()) {
-                            continue;
-                        }
-                        if (TYPE(pPosition->GetPiece(fromI.BitOffset())) !=
-                            TYPE(pPosition->GetPiece(fromJ.BitOffset()))) {
-                            continue;
-                        }
-                        if (fromI.m_nFile == fromJ.m_nFile &&
-                            fromI.m_nRank == fromJ.m_nRank &&
-                            fromI.m_nLevel != fromJ.m_nLevel) {
-                            nLevelDisambiguations++;
-                        }
-                    }
-                }
                 pPosition->DoMove(rgMoves[Next() % rgMoves.size()]);
             }
             CPosition::Free(pPosition);
         }
-        Assert::IsTrue(
-            nLevelDisambiguations > 0,
-            L"test did not exercise any level-only disambiguation cases");
     }
 
     // IsCheckingMove must agree with actually making the move and testing for
@@ -145,19 +116,11 @@ TEST_CLASS(SanAndCheckTests) {
         Assert::IsTrue(position.get()->LegalMove(move));
     }
 
-    // Regression for the reported "compute strategy recommended the illegal
-    // move Rca3" bug.  The search was finding a legitimate cross-level rook
-    // move, but the level-blind SAN rendered it as a string whose square no
-    // rook can reach.  Now every legal move in this exact position must
-    // round-trip through SAN, and the bogus "Rca3" must not resolve to any
-    // legal move.
+    // Every legal move in this position must round-trip through SAN, and a SAN
+    // string for a square no rook can reach must not resolve to a legal move.
     TEST_METHOD(StrategyEpdSanRoundTripsAndRejectsRca3) {
         const char *szEpd =
-            "1|2/1r|3/3/3|4/4/4/4|4R/5/5/5/5|6/6/6/6/6/4N1|"
-            "ppppppp/7/7/7/7/2NPN2/PPPQPPP|"
-            "r1bq1rk1/p1pp1ppp/1pnbp3/8/8/8/PPPPPPPP/2BQ1B1R|"
-            "1nbqb1r/ppppppp/4n2/7/7/PP1PPPP/1NBKB1R|"
-            "pppppp/6/6/6/P5/1PPPPP|5/5/5/5/5|4/4/4/4|3/3/3|2/2|1 w - -";
+            "r1bq1rk1/p1pp1ppp/1pnbp3/8/8/2NPN3/PPPQPPPP/2BR1BKR w - -";
         PositionGuard position(CPosition::CreateFromEPD(szEpd));
         CPosition *pPosition = position.get();
 
@@ -171,19 +134,13 @@ TEST_CLASS(SanAndCheckTests) {
                            L"ParseSAN returned M_NONE for a generated SAN");
             Assert::IsTrue(parsed.GetFromToIndex() == move.GetFromToIndex(),
                            L"SAN did not round-trip to the same move");
-            Assert::IsTrue(strSan != "Rca3",
-                           L"no legal move should be rendered as Rca3");
         }
 
-        // ca3 (level c, file a, rank 3) is unreachable by any rook here.
-        CSCoord targetCoord(2, 0, 2);
-        uint16_t wTarget = targetCoord.BitOffset();
-        for (CMove move : rgMoves) {
-            Assert::IsFalse(move.GetToCoord().BitOffset() == wTarget,
-                            L"no legal move should target the unreachable ca3");
-        }
-        Assert::IsTrue(pPosition->ParseSAN("Rca3") == M_NONE,
-                       L"Rca3 must not parse to a legal move");
+        // No rook can reach aa3 (level a, file a, rank 3): the d1 rook is
+        // blocked along its file and rank, and the h1 rook is boxed in by the
+        // king, so the rook-qualified SAN "Raa3" must not resolve to a move.
+        Assert::IsTrue(pPosition->ParseSAN("Raa3") == M_NONE,
+                       L"Raa3 must not parse to a legal move");
     }
 };
 
